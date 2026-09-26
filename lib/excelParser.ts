@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 // CONFIG — adjust this ONE constant to match your exact Excel header text.
 // Must match the header cell in row 1 exactly (case-sensitive).
 // ---------------------------------------------------------------------
-export const AWB_COLUMN_HEADER = "AWB Number"; // <-- change to your real header text
+export const AWB_COLUMN_HEADER = "Tracking Number"; // matches your real Excel header exactly
 
 export interface ParsedRow {
   awb_number: string;

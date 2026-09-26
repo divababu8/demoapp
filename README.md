@@ -35,7 +35,7 @@ Open `.env.local` and paste in the 3 values from Step 1.6.
 Open `lib/excelParser.ts` and confirm this line matches your actual Excel header text **exactly**:
 
 ```ts
-export const AWB_COLUMN_HEADER = "AWB Number";
+export const AWB_COLUMN_HEADER = "Tracking Number";
 ```
 
 (Since your headers are fixed across all files, you only ever set this once.)
