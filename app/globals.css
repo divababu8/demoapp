@@ -1,25 +1,27 @@
 /* =====================================================================
-   DESIGN SYSTEM — "Cargo Ledger"
-   A logistics/manifest tool reads like a ledger: paper workspace, ink-navy
-   structure, a container-teal accent for action/status, monospace for
-   AWB & manifest codes since those are literal data identifiers.
+   DESIGN SYSTEM — updated to match the "Wallet" template palette:
+   fresh green primary, dark navy structure, Rubik type, soft rounded
+   cards/buttons. AWB & manifest codes stay monospace (IBM Plex Mono)
+   since those are literal data identifiers, not decoration.
    ===================================================================== */
 
 :root {
-  --ink: #16212c;
-  --ink-muted: #5b6b7a;
-  --paper: #f5f6f2;
+  --ink: #233242;
+  --ink-muted: #888888;
+  --paper: #fbfbfb;
   --surface: #ffffff;
-  --border: #e1e4e2;
-  --border-soft: #eef0ec;
-  --accent: #0e6b5c;
-  --accent-soft: #e4f3ee;
-  --danger: #b3261e;
-  --danger-soft: #fbeae8;
-  --warning: #b45309;
-  --warning-soft: #fdf1e2;
-  --radius: 8px;
-  --shadow-card: 0 1px 2px rgba(22, 33, 44, 0.04);
+  --border: #eaeaea;
+  --border-soft: #f2f2f2;
+  --accent: #51b56d;
+  --accent-dark: #439a5c;
+  --accent-soft: #e7f6ec;
+  --secondary: #917aeb;
+  --danger: #e5484d;
+  --danger-soft: #fdeceb;
+  --warning: #f2994a;
+  --warning-soft: #fdf1e5;
+  --radius: 12px;
+  --shadow-card: 0 10px 30px rgba(22, 28, 45, 0.06);
 }
 
 * {
@@ -31,16 +33,16 @@ body {
   margin: 0;
   padding: 0;
   background: var(--paper);
-  color: var(--ink);
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink-muted);
+  font-family: "Rubik", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3 {
-  font-family: "Space Grotesk", "Inter", sans-serif;
-  font-weight: 600;
+  font-family: "Rubik", sans-serif;
+  font-weight: 700;
   color: var(--ink);
   margin: 0;
 }
@@ -109,21 +111,21 @@ input, select, button {
 }
 
 .sidebar-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.7rem;
+  font-family: "Rubik", sans-serif;
+  font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
 }
 
 .sidebar-brand-text {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Rubik", sans-serif;
   font-size: 1.02rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -139,7 +141,7 @@ input, select, button {
 .nav-link {
   display: block;
   padding: 9px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   color: rgba(255, 255, 255, 0.68);
   text-decoration: none;
   font-size: 0.9rem;
@@ -164,7 +166,7 @@ input, select, button {
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: rgba(255, 255, 255, 0.8);
   padding: 9px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.85rem;
 }
@@ -241,7 +243,7 @@ table.data-table {
   top: 0;
   text-align: left;
   padding: 11px 14px;
-  background: #f0f1ec;
+  background: #f4f5f4;
   border-bottom: 1px solid var(--border);
   color: var(--ink-muted);
   font-weight: 600;
@@ -263,7 +265,7 @@ table.data-table {
 .data-table tr.totals-row td {
   font-weight: 700;
   border-top: 2px solid var(--ink);
-  background: #fafaf8;
+  background: #f9f9f9;
 }
 
 .mono {
@@ -318,7 +320,7 @@ table.data-table {
 .field input,
 .field select {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 8px 11px;
   font-size: 0.88rem;
   background: #fff;
@@ -337,12 +339,12 @@ table.data-table {
 
 .btn {
   border: none;
-  border-radius: 6px;
-  padding: 9px 18px;
+  border-radius: 10px;
+  padding: 11px 22px;
   font-size: 0.86rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: opacity 0.15s ease, background 0.15s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .btn-primary {
@@ -351,17 +353,18 @@ table.data-table {
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
+  background: var(--accent-dark);
 }
 
 .btn-outline {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--ink);
+  background: var(--accent-soft);
+  border: none;
+  color: var(--accent-dark);
 }
 
 .btn-outline:hover {
-  background: #f0f1ec;
+  background: var(--accent);
+  color: #fff;
 }
 
 .btn:disabled {
@@ -467,7 +470,7 @@ table.data-table {
   font-size: 0.9rem;
   background: var(--danger-soft);
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .scan-result {
@@ -511,7 +514,7 @@ table.data-table {
   align-items: center;
   justify-content: center;
   background: var(--ink);
-  background-image: radial-gradient(circle at 20% 20%, rgba(14, 107, 92, 0.25), transparent 55%);
+  background-image: radial-gradient(circle at 20% 20%, rgba(81, 181, 109, 0.28), transparent 55%);
 }
 
 .login-card {
@@ -523,15 +526,15 @@ table.data-table {
 }
 
 .login-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.8rem;
+  font-family: "Rubik", sans-serif;
+  font-size: 0.85rem;
   font-weight: 700;
   color: #fff;
   margin-bottom: 16px;
@@ -556,7 +559,7 @@ table.data-table {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 0.9rem;
 }
 
