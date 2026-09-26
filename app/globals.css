@@ -1077,3 +1077,704 @@ table.data-table {
   .main { padding: 24px 18px 40px; }
   .stat-grid { flex-direction: column; }
 }
+
+/* =====================================================================
+   SCANNING PAGE — enhanced panel, status banner, detail grid
+   ===================================================================== */
+
+/* --- Scan input panel --- */
+.scan-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 18px;
+}
+
+.scan-panel-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+@media (max-width: 640px) {
+  .scan-panel-row {
+    flex-direction: column;
+  }
+}
+
+.scan-panel-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.scan-panel .scan-input {
+  width: 100%;
+  padding: 16px 20px;
+  font-size: 1.15rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.scan-panel .scan-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+/* Flash states — brief visual confirmation after submit */
+.scan-input-ok {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 4px var(--accent-soft) !important;
+}
+.scan-input-warn {
+  border-color: var(--warning) !important;
+  box-shadow: 0 0 0 4px var(--warning-soft) !important;
+}
+.scan-input-err {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 4px var(--danger-soft) !important;
+}
+
+.scan-panel .scan-pending-indicator {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.scan-search-btn,
+.scan-clear-btn {
+  padding: 0 26px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.scan-hint {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+/* --- Status banner --- */
+.scan-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 18px;
+}
+.scan-status-ok {
+  background: linear-gradient(90deg, var(--accent-soft), #fff);
+  border-color: rgba(81, 181, 109, 0.35);
+}
+.scan-status-warn {
+  background: linear-gradient(90deg, var(--warning-soft), #fff);
+  border-color: rgba(242, 153, 74, 0.35);
+}
+
+.scan-status-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.scan-status-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.scan-status-ok .scan-status-icon {
+  background: #fff;
+  color: var(--accent-dark);
+  border: 1px solid rgba(81, 181, 109, 0.35);
+}
+.scan-status-warn .scan-status-icon {
+  background: #fff;
+  color: #b45309;
+  border: 1px solid rgba(242, 153, 74, 0.35);
+}
+
+.scan-status-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.scan-status-sub {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scan-status-manifest {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+/* --- Detail grid --- */
+.scan-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1px;
+  background: var(--border-soft);
+}
+.scan-detail-item {
+  background: var(--surface);
+  padding: 14px 18px;
+  min-width: 0;
+}
+.scan-detail-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+.scan-detail-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+/* --- Empty / idle state --- */
+.scan-empty {
+  text-align: center;
+  padding: 52px 20px;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.scan-empty svg {
+  opacity: 0.35;
+  margin-bottom: 12px;
+}
+.scan-empty-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.scan-empty-sub {
+  font-size: 0.85rem;
+}
+.scan-empty-last {
+  margin-top: 14px;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+/* --- Mini spinner (also used on Upload page) --- */
+.mini-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: miniSpin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes miniSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- Smaller inline spinner for scan-pending-indicator --- */
+.scan-pending-indicator .mini-spinner {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+}
+
+
+/* =====================================================================
+   UPLOAD PAGE — enhanced dropzone + progress list + batch summary
+   ===================================================================== */
+
+/* Dropzone icon */
+.dropzone-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+  color: var(--accent);
+}
+
+/* Batch summary strip */
+.batch-summary {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 18px;
+  margin-top: 18px;
+}
+@media (max-width: 900px) { .batch-summary { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .batch-summary { grid-template-columns: 1fr; } }
+
+.batch-summary-item {
+  text-align: center;
+  padding: 10px 8px;
+  border-radius: 10px;
+  background: var(--header-bg);
+}
+.batch-summary-value {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.batch-summary-label {
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+.batch-success .batch-summary-value { color: var(--accent-dark); }
+.batch-warning .batch-summary-value { color: #b45309; }
+.batch-danger  .batch-summary-value { color: var(--danger); }
+.batch-info    .batch-summary-value { color: var(--info); }
+
+/* Per-file progress list */
+.upload-progress-list {
+  padding: 8px 20px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.upload-progress-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.upload-progress-item:last-child { border-bottom: none; }
+
+.upload-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.upload-progress-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.upload-progress-name .mono {
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 420px;
+}
+.upload-progress-size {
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+/* Status pill */
+.upload-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.upload-pill-neutral { background: var(--header-bg); color: var(--ink-muted); }
+.upload-pill-success { background: var(--accent-soft); color: var(--accent-dark); }
+.upload-pill-warning { background: var(--warning-soft); color: #92400e; }
+.upload-pill-danger  { background: var(--danger-soft);  color: #991b1b; }
+
+/* Progress bar */
+.upload-progress-bar-track {
+  height: 6px;
+  background: var(--border-soft);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.upload-progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.25s ease;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+}
+.upload-progress-bar-fill-success { background: linear-gradient(90deg, var(--accent), var(--accent-dark)); }
+.upload-progress-bar-fill-warning { background: linear-gradient(90deg, var(--warning), #d97706); }
+.upload-progress-bar-fill-danger  { background: linear-gradient(90deg, var(--danger), #b91c1c); }
+.upload-progress-bar-fill-neutral { background: linear-gradient(90deg, var(--accent), var(--accent-dark)); }
+
+/* Meta line */
+.upload-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+.upload-progress-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.upload-progress-pct {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+/* Mini spinner inside the pill — already defined in Scanning block,
+   but included here so this file works even if you paste Upload CSS
+   before Scanning CSS. Duplicate is harmless. */
+.mini-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: miniSpin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes miniSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* =====================================================================
+   OVERAGES PAGE — row progress bars
+   ===================================================================== */
+
+.overages-list {
+  padding: 8px 20px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.overage-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.overage-row:last-child { border-bottom: none; }
+
+.overage-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.overage-row-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.overage-row-manifest {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.overage-row-right {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.overage-row-counts {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.overage-row-counts strong { font-weight: 700; }
+
+.overage-row-pct {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+  min-width: 40px;
+  text-align: right;
+}
+
+.overage-row-bar {
+  height: 8px;
+  background: var(--border-soft);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.overage-row-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+}
+.overage-row-fill.danger {
+  background: linear-gradient(90deg, var(--danger), #b91c1c);
+}
+.overage-row-fill.complete {
+  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+}
+
+.overage-row-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  flex-wrap: wrap;
+}
+
+
+/* =====================================================================
+   SCANNING PAGE
+   ===================================================================== */
+.scan-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 18px;
+}
+.scan-panel-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+@media (max-width: 640px) {
+  .scan-panel-row { flex-direction: column; }
+}
+.scan-panel-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.scan-panel .scan-input {
+  width: 100%;
+  padding: 16px 20px;
+  font-size: 1.15rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.scan-panel .scan-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.scan-input-ok {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 4px var(--accent-soft) !important;
+}
+.scan-input-warn {
+  border-color: var(--warning) !important;
+  box-shadow: 0 0 0 4px var(--warning-soft) !important;
+}
+.scan-input-err {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 4px var(--danger-soft) !important;
+}
+.scan-panel .scan-pending-indicator {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  pointer-events: none;
+}
+.scan-search-btn,
+.scan-clear-btn {
+  padding: 0 26px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.scan-hint {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+.scan-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 18px;
+}
+.scan-status-ok {
+  background: linear-gradient(90deg, var(--accent-soft), #fff);
+  border-color: rgba(81, 181, 109, 0.35);
+}
+.scan-status-warn {
+  background: linear-gradient(90deg, var(--warning-soft), #fff);
+  border-color: rgba(242, 153, 74, 0.35);
+}
+.scan-status-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.scan-status-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.scan-status-ok .scan-status-icon {
+  background: #fff;
+  color: var(--accent-dark);
+  border: 1px solid rgba(81, 181, 109, 0.35);
+}
+.scan-status-warn .scan-status-icon {
+  background: #fff;
+  color: #b45309;
+  border: 1px solid rgba(242, 153, 74, 0.35);
+}
+.scan-status-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.scan-status-sub {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scan-status-manifest {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+.scan-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1px;
+  background: var(--border-soft);
+}
+.scan-detail-item {
+  background: var(--surface);
+  padding: 14px 18px;
+  min-width: 0;
+}
+.scan-detail-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+.scan-detail-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-word;
+}
+.scan-empty {
+  text-align: center;
+  padding: 52px 20px;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.scan-empty svg {
+  opacity: 0.35;
+  margin-bottom: 12px;
+}
+.scan-empty-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.scan-empty-sub { font-size: 0.85rem; }
+.scan-empty-last {
+  margin-top: 14px;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+.mini-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: miniSpin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes miniSpin {
+  to { transform: rotate(360deg); }
+}
+.scan-pending-indicator .mini-spinner {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+}

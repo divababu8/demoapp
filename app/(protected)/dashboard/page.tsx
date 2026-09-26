@@ -14,7 +14,7 @@ interface ManifestRow {
   scanned_count: number;
   pending_count: number;
   total_search_count: number;
-  oldest_pending_at: string | null; // used to compute ">10h" overage
+  oldest_pending_at: string | null;
 }
 
 interface BillLite {
@@ -32,9 +32,6 @@ const OVERAGE_HOURS = 10;
 
 function isOverage(row: ManifestRow): boolean {
   if (row.pending_count <= 0) return false;
-  // Treat it as overage if the oldest pending bill is older than OVERAGE_HOURS,
-  // OR if the manifest itself was uploaded more than OVERAGE_HOURS ago with
-  // bills still pending.
   const ref = row.oldest_pending_at ?? row.upload_date;
   const hours = (Date.now() - new Date(ref).getTime()) / 36e5;
   return hours >= OVERAGE_HOURS;
@@ -47,70 +44,96 @@ export default function DashboardPage() {
   const [manifests, setManifests] = useState<ManifestRow[]>([]);
   const [bills, setBills] = useState<BillLite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [realtimeStatus, setRealtimeStatus] = useState<string>("connecting");
 
-  /* ---------- data loaders ---------- */
-  async function loadAll() {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const startIso = start.toISOString();
-    const endIso = new Date().toISOString();
-
-    const { data: reportRows } = await supabase
-      .from("manifest_report")
-      .select("*");
-
-    // Today's bills only (for KPI numbers)
-    const { data: todayBills } = await supabase
-      .from("bills")
-      .select("id, manifest_id, scan_status, created_at, scanned_at")
-      .gte("created_at", startIso)
-      .lte("created_at", endIso);
-
-    // Oldest pending timestamp per manifest (for overage calc)
-    const { data: pendingBills } = await supabase
-      .from("bills")
-      .select("manifest_id, created_at")
-      .eq("scan_status", "pending")
-      .order("created_at", { ascending: true });
-
-    const oldestByManifest = new Map<string, string>();
-    (pendingBills ?? []).forEach((b: any) => {
-      if (!oldestByManifest.has(b.manifest_id)) {
-        oldestByManifest.set(b.manifest_id, b.created_at);
-      }
-    });
-
-    const enriched: ManifestRow[] = (reportRows ?? []).map((r: any) => ({
-      ...r,
-      oldest_pending_at: oldestByManifest.get(r.manifest_id) ?? null,
-    }));
-
-    setManifests(enriched);
-    setBills(todayBills ?? []);
-    setLoading(false);
-  }
-
+  /* ---------- realtime + initial load ---------- */
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadAll() {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const startIso = start.toISOString();
+      const endIso = new Date().toISOString();
+
+      const { data: reportRows } = await supabase
+        .from("manifest_report")
+        .select("*");
+
+      const { data: todayBills } = await supabase
+        .from("bills")
+        .select("id, manifest_id, scan_status, created_at, scanned_at")
+        .gte("created_at", startIso)
+        .lte("created_at", endIso);
+
+      const { data: pendingBills } = await supabase
+        .from("bills")
+        .select("manifest_id, created_at")
+        .eq("scan_status", "pending")
+        .order("created_at", { ascending: true });
+
+      if (!isMounted) return;
+
+      const oldestByManifest = new Map<string, string>();
+      (pendingBills ?? []).forEach((b: any) => {
+        if (!oldestByManifest.has(b.manifest_id)) {
+          oldestByManifest.set(b.manifest_id, b.created_at);
+        }
+      });
+
+      const enriched: ManifestRow[] = (reportRows ?? []).map((r: any) => ({
+        ...r,
+        oldest_pending_at: oldestByManifest.get(r.manifest_id) ?? null,
+      }));
+
+      setManifests(enriched);
+      setBills(todayBills ?? []);
+      setLoading(false);
+    }
+
     loadAll();
+
+    // Unique channel name to survive React Strict Mode double-mount + Fast Refresh
+    const channelName = `dashboard-live-${Math.random()
+      .toString(36)
+      .slice(2, 9)}`;
+
     const channel = supabase
-      .channel("dashboard-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, loadAll)
-      .on("postgres_changes", { event: "*", schema: "public", table: "manifests" }, loadAll)
-      .subscribe();
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bills" },
+        (payload) => {
+          console.log("[dashboard] bills changed:", payload.eventType);
+          loadAll();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "manifests" },
+        (payload) => {
+          console.log("[dashboard] manifests changed:", payload.eventType);
+          loadAll();
+        }
+      )
+      .subscribe((status) => {
+        console.log("[dashboard] realtime status:", status);
+        if (isMounted) setRealtimeStatus(status);
+      });
+
     return () => {
+      isMounted = false;
       supabase.removeChannel(channel);
     };
   }, []);
 
   /* ---------- derived KPIs ---------- */
   const kpi = useMemo(() => {
-    const todaysBillIds = new Set(bills.map((b) => b.id));
     const totalShipments = bills.length;
     const scanCount = bills.filter((b) => b.scan_status === "scanned").length;
     const pendingCount = bills.filter((b) => b.scan_status === "pending").length;
     const shortage = pendingCount;
 
-    // Overage = bills still pending that came from manifests now in overage state
     const overageManifestIds = new Set(
       manifests.filter(isOverage).map((m) => m.manifest_id)
     );
@@ -119,7 +142,8 @@ export default function DashboardPage() {
         b.scan_status === "pending" && overageManifestIds.has(b.manifest_id)
     ).length;
 
-    const completion = totalShipments === 0 ? 0 : (scanCount / totalShipments) * 100;
+    const completion =
+      totalShipments === 0 ? 0 : (scanCount / totalShipments) * 100;
     return { totalShipments, scanCount, shortage, overage, completion };
   }, [bills, manifests]);
 
@@ -138,8 +162,7 @@ export default function DashboardPage() {
   }, [manifests]);
 
   /* ---------- charts (pure SVG, no chart lib) ---------- */
-  const last7 = useMemo(() => {
-    // Group today's bills by hour for a scan-velocity sparkline
+  const hourly = useMemo(() => {
     const buckets = new Array(24).fill(0);
     bills
       .filter((b) => b.scan_status === "scanned")
@@ -173,8 +196,15 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="page-header-actions">
-          <span className="live-pill">
-            <span className="live-dot" /> Live
+          <span
+            className="live-pill"
+            title={`Realtime: ${realtimeStatus}`}
+            style={{
+              opacity: realtimeStatus === "SUBSCRIBED" ? 1 : 0.6,
+            }}
+          >
+            <span className="live-dot" />{" "}
+            {realtimeStatus === "SUBSCRIBED" ? "Live" : "Connecting…"}
           </span>
         </div>
       </div>
@@ -213,7 +243,6 @@ export default function DashboardPage() {
 
       {/* ============ PROGRESS + CHARTS ============ */}
       <div className="dash-two-col">
-        {/* Completion progress */}
         <section className="panel">
           <div className="panel-header">
             <div>
@@ -222,9 +251,7 @@ export default function DashboardPage() {
                 {kpi.scanCount} scanned / {kpi.totalShipments} total
               </div>
             </div>
-            <div className="panel-badge">
-              {kpi.completion.toFixed(1)}%
-            </div>
+            <div className="panel-badge">{kpi.completion.toFixed(1)}%</div>
           </div>
           <div className="big-progress">
             <div
@@ -245,7 +272,6 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Hourly scan velocity */}
         <section className="panel">
           <div className="panel-header">
             <div>
@@ -253,7 +279,7 @@ export default function DashboardPage() {
               <div className="panel-sub">Peak hour activity</div>
             </div>
           </div>
-          <HourlySparkline data={last7} />
+          <HourlySparkline data={hourly} />
         </section>
       </div>
 
@@ -279,7 +305,11 @@ export default function DashboardPage() {
               <div key={m.manifest_id} className="top-row">
                 <div className="top-row-main">
                   <span className="mono">{m.manifest_number}</span>
-                  <span className={`badge ${over ? "badge-danger" : "badge-pending"}`}>
+                  <span
+                    className={`badge ${
+                      over ? "badge-danger" : "badge-pending"
+                    }`}
+                  >
                     {over ? "Overage" : "Pending"}
                   </span>
                 </div>
@@ -338,7 +368,9 @@ export default function DashboardPage() {
                     <td>
                       <span
                         className={`badge ${
-                          m.pending_count > 0 ? "badge-pending" : "badge-scanned"
+                          m.pending_count > 0
+                            ? "badge-pending"
+                            : "badge-scanned"
                         }`}
                       >
                         {m.pending_count}
@@ -361,7 +393,9 @@ export default function DashboardPage() {
               {!loading && manifests.length === 0 && (
                 <tr>
                   <td colSpan={7}>
-                    <p className="empty-note">No manifests yet — upload one to begin.</p>
+                    <p className="empty-note">
+                      No manifests yet — upload one to begin.
+                    </p>
                   </td>
                 </tr>
               )}
@@ -380,9 +414,21 @@ export default function DashboardPage() {
       {/* ============ ALL-TIME SUMMARY ============ */}
       <div className="quick-stats">
         <QuickStat label="Total bills (all time)" value={allTime.total} />
-        <QuickStat label="Scanned (all time)" value={allTime.scanned} tone="success" />
-        <QuickStat label="Pending (all time)" value={allTime.pending} tone="warning" />
-        <QuickStat label="Search attempts" value={allTime.searches} tone="primary" />
+        <QuickStat
+          label="Scanned (all time)"
+          value={allTime.scanned}
+          tone="success"
+        />
+        <QuickStat
+          label="Pending (all time)"
+          value={allTime.pending}
+          tone="warning"
+        />
+        <QuickStat
+          label="Search attempts"
+          value={allTime.searches}
+          tone="primary"
+        />
         <QuickStat
           label="Overall completion"
           value={`${allTime.completion.toFixed(1)}%`}
@@ -437,7 +483,6 @@ function QuickStat({
   );
 }
 
-/* Simple, dependency-free hourly bar chart */
 function HourlySparkline({ data }: { data: number[] }) {
   const max = Math.max(1, ...data);
   return (
@@ -465,6 +510,7 @@ const iconProps = {
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
 };
+
 const IconBox = () => (
   <svg {...iconProps}>
     <path d="m3 7 9-4 9 4-9 4-9-4z" />
@@ -472,18 +518,21 @@ const IconBox = () => (
     <path d="M12 11v10" />
   </svg>
 );
+
 const IconCheck = () => (
   <svg {...iconProps}>
     <circle cx="12" cy="12" r="9" />
     <path d="m8 12 3 3 5-6" />
   </svg>
 );
+
 const IconClock = () => (
   <svg {...iconProps}>
     <circle cx="12" cy="12" r="9" />
     <path d="M12 7v5l3 2" />
   </svg>
 );
+
 const IconAlert = () => (
   <svg {...iconProps}>
     <path d="M12 3 2 20h20L12 3z" />
