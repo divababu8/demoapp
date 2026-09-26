@@ -7,11 +7,15 @@
 
 :root {
   --ink: #233242;
-  --ink-muted: #888888;
-  --paper: #fbfbfb;
+  --ink-muted: #7a8894;
+  /* Paper is now clearly darker/cooler than card surfaces, so every card,
+     table, and panel visibly separates from the page instead of blending in. */
+  --paper: #eef1f4;
   --surface: #ffffff;
-  --border: #eaeaea;
-  --border-soft: #f2f2f2;
+  --border: #dde3e8;
+  --border-soft: #eef1f4;
+  --header-bg: #f4f7f5;
+  --row-alt: #f8faf9;
   --accent: #51b56d;
   --accent-dark: #439a5c;
   --accent-soft: #e7f6ec;
@@ -21,7 +25,7 @@
   --warning: #f2994a;
   --warning-soft: #fdf1e5;
   --radius: 12px;
-  --shadow-card: 0 10px 30px rgba(22, 28, 45, 0.06);
+  --shadow-card: 0 4px 18px rgba(35, 50, 66, 0.08);
 }
 
 * {
@@ -190,9 +194,14 @@ input, select, button {
   min-width: 170px;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
   border-radius: var(--radius);
-  padding: 20px 22px;
+  padding: 22px 24px;
   box-shadow: var(--shadow-card);
+}
+
+.stat-card.danger-edge {
+  border-left-color: var(--danger);
 }
 
 .stat-value {
@@ -218,13 +227,29 @@ input, select, button {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px 22px;
+  padding: 22px 24px;
   box-shadow: var(--shadow-card);
+}
+
+/* Groups a filter bar visually with the table beneath it, instead of
+   both floating loosely against the page background. */
+.filter-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 18px 22px;
+  margin: 22px 0 18px;
+}
+
+.filter-panel .filter-bar {
+  margin: 0;
 }
 
 /* ---------- Tables ---------- */
 
 .table-wrap {
+  overflow: hidden;
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -242,17 +267,29 @@ table.data-table {
   position: sticky;
   top: 0;
   text-align: left;
-  padding: 11px 14px;
-  background: #f4f5f4;
-  border-bottom: 1px solid var(--border);
-  color: var(--ink-muted);
+  padding: 13px 16px;
+  background: var(--header-bg);
+  border-bottom: 2px solid var(--border);
+  color: var(--ink);
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   white-space: nowrap;
 }
 
+.data-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.data-table tbody tr:nth-child(even) {
+  background: var(--row-alt);
+}
+
+.data-table tbody tr:hover {
+  background: var(--accent-soft);
+}
+
 .data-table td {
-  padding: 10px 14px;
+  padding: 11px 16px;
   border-bottom: 1px solid var(--border-soft);
   white-space: nowrap;
   color: var(--ink);
@@ -262,10 +299,13 @@ table.data-table {
   border-bottom: none;
 }
 
+.data-table tr.totals-row {
+  background: var(--header-bg) !important;
+}
+
 .data-table tr.totals-row td {
   font-weight: 700;
   border-top: 2px solid var(--ink);
-  background: #f9f9f9;
 }
 
 .mono {

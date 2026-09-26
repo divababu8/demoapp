@@ -106,24 +106,26 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <div className="filter-bar">
-          <div className="field">
-            <label>From</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        <div className="filter-panel">
+          <div className="filter-bar">
+            <div className="field">
+              <label>From</label>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>To</label>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+            <button onClick={loadReport} className="btn btn-outline">
+              {loading ? "Loading…" : "Apply"}
+            </button>
+            <button onClick={exportExcel} disabled={rows.length === 0} className="btn btn-primary">
+              Export Excel
+            </button>
+            <button onClick={exportPdf} disabled={rows.length === 0} className="btn btn-outline">
+              Export PDF
+            </button>
           </div>
-          <div className="field">
-            <label>To</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          </div>
-          <button onClick={loadReport} className="btn btn-outline">
-            {loading ? "Loading…" : "Apply"}
-          </button>
-          <button onClick={exportExcel} disabled={rows.length === 0} className="btn btn-primary">
-            Export Excel
-          </button>
-          <button onClick={exportPdf} disabled={rows.length === 0} className="btn btn-outline">
-            Export PDF
-          </button>
         </div>
 
         <div className="table-wrap">

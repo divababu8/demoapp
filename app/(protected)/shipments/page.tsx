@@ -43,20 +43,22 @@ export default function ShipmentsPage() {
           <p className="page-subtitle">Defaults to today — filter for any date range or manifest.</p>
         </div>
 
-        <div className="filter-bar">
-          <div className="field">
-            <label>Manifest #</label>
-            <input value={manifestFilter} onChange={(e) => setManifestFilter(e.target.value)} placeholder="Search manifest" />
+        <div className="filter-panel">
+          <div className="filter-bar">
+            <div className="field">
+              <label>Manifest #</label>
+              <input value={manifestFilter} onChange={(e) => setManifestFilter(e.target.value)} placeholder="Search manifest" />
+            </div>
+            <div className="field">
+              <label>From</label>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>To</label>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+            <button onClick={loadData} className="btn btn-primary">Apply filter</button>
           </div>
-          <div className="field">
-            <label>From</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>To</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          </div>
-          <button onClick={loadData} className="btn btn-primary">Apply filter</button>
         </div>
 
         <div className="table-wrap">

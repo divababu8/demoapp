@@ -89,7 +89,7 @@ export default function DashboardPage() {
             <div className="stat-value success">{stats.scannedCount}</div>
             <div className="stat-label">Scan finished</div>
           </div>
-          <div className="stat-card">
+          <div className="stat-card danger-edge">
             <div className="stat-value danger">{stats.pendingCount}</div>
             <div className="stat-label">Scan pending (overages)</div>
           </div>
