@@ -25,28 +25,35 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center" }}>
-      <form onSubmit={handleLogin} style={{ width: 320, padding: 24, border: "1px solid #ddd", borderRadius: 8 }}>
-        <h2 style={{ marginBottom: 16 }}>Manifest Dashboard Login</h2>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={{ width: "100%", padding: 8, marginBottom: 10 }}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          style={{ width: "100%", padding: 8, marginBottom: 10 }}
-        />
-        {error && <p style={{ color: "red", fontSize: 13 }}>{error}</p>}
-        <button type="submit" disabled={loading} style={{ width: "100%", padding: 10 }}>
-          {loading ? "Logging in..." : "Login"}
+    <div className="login-shell">
+      <form onSubmit={handleLogin} className="login-card">
+        <div className="login-mark">MF</div>
+        <h2 className="login-brand">Manifest Scanning Desk</h2>
+        <p className="login-sub">Sign in to view manifests and record scans.</p>
+
+        <div className="field">
+          <label>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="field">
+          <label>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+
+        {error && <p className="login-error">{error}</p>}
+
+        <button type="submit" disabled={loading} className="btn btn-primary">
+          {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </div>

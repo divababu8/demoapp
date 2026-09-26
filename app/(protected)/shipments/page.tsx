@@ -32,64 +32,65 @@ export default function ShipmentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Dynamic columns: derived from the first row's extra_data keys so the
-  // table always reflects whatever ~38 columns exist, with no hardcoding.
   const extraColumns = rows.length > 0 ? Object.keys(rows[0].extra_data) : [];
 
   return (
-    <div style={{ display: "flex" }}>
+    <div className="app-shell">
       <Sidebar />
-      <main style={{ flex: 1, padding: 24, overflowX: "auto" }}>
-        <h1>Shipments</h1>
-
-        <div style={{ display: "flex", gap: 12, alignItems: "end", marginTop: 12 }}>
-          <div>
-            <label>Manifest #</label><br />
-            <input value={manifestFilter} onChange={(e) => setManifestFilter(e.target.value)} />
-          </div>
-          <div>
-            <label>From</label><br />
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          </div>
-          <div>
-            <label>To</label><br />
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          </div>
-          <button onClick={loadData}>Apply Filter</button>
+      <main className="main">
+        <div className="page-header">
+          <h1 className="page-title">Shipments</h1>
+          <p className="page-subtitle">Defaults to today — filter for any date range or manifest.</p>
         </div>
 
-        <div style={{ marginTop: 20, overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <div className="filter-bar">
+          <div className="field">
+            <label>Manifest #</label>
+            <input value={manifestFilter} onChange={(e) => setManifestFilter(e.target.value)} placeholder="Search manifest" />
+          </div>
+          <div className="field">
+            <label>From</label>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>To</label>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+          <button onClick={loadData} className="btn btn-primary">Apply filter</button>
+        </div>
+
+        <div className="table-wrap">
+          <table className="data-table">
             <thead>
               <tr>
-                <th style={thStyle}>Manifest #</th>
-                <th style={thStyle}>AWB Number</th>
-                <th style={thStyle}>Scan Status</th>
+                <th>Manifest #</th>
+                <th>AWB Number</th>
+                <th>Scan Status</th>
                 {extraColumns.map((col) => (
-                  <th key={col} style={thStyle}>{col}</th>
+                  <th key={col}>{col}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={i}>
-                  <td style={tdStyle}>{r.manifests?.manifest_number}</td>
-                  <td style={tdStyle}>{r.awb_number}</td>
-                  <td style={tdStyle}>{r.scan_status}</td>
+                  <td className="mono">{r.manifests?.manifest_number}</td>
+                  <td className="mono">{r.awb_number}</td>
+                  <td>
+                    <span className={`badge ${r.scan_status === "scanned" ? "badge-scanned" : "badge-pending"}`}>
+                      {r.scan_status}
+                    </span>
+                  </td>
                   {extraColumns.map((col) => (
-                    <td key={col} style={tdStyle}>
-                      {r.extra_data[col] === null ? "-" : String(r.extra_data[col])}
-                    </td>
+                    <td key={col}>{r.extra_data[col] === null ? "–" : String(r.extra_data[col])}</td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
+          {rows.length === 0 && <p className="empty-note">No shipments in this date range.</p>}
         </div>
       </main>
     </div>
   );
 }
-
-const thStyle: React.CSSProperties = { border: "1px solid #eee", padding: 6, background: "#fafafa", whiteSpace: "nowrap" };
-const tdStyle: React.CSSProperties = { border: "1px solid #f5f5f5", padding: 6, whiteSpace: "nowrap" };

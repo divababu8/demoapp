@@ -8,7 +8,7 @@ interface Stats {
   totalManifests: number;
   totalBills: number;
   scannedCount: number;
-  pendingCount: number; // overages
+  pendingCount: number;
 }
 
 export default function DashboardPage() {
@@ -49,8 +49,6 @@ export default function DashboardPage() {
   useEffect(() => {
     loadStats();
 
-    // Realtime: any insert/update on bills or manifests -> refresh counters
-    // instantly for both scanners, no manual refresh needed.
     const channel = supabase
       .channel("dashboard-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, loadStats)
@@ -62,36 +60,38 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const cardStyle: React.CSSProperties = {
-    flex: 1,
-    padding: 20,
-    border: "1px solid #eee",
-    borderRadius: 8,
-    textAlign: "center",
-  };
-
   return (
-    <div style={{ display: "flex" }}>
+    <div className="app-shell">
       <Sidebar />
-      <main style={{ flex: 1, padding: 24 }}>
-        <h1>Dashboard</h1>
-        <p style={{ color: "#666" }}>{new Date().toLocaleDateString()}</p>
-        <div style={{ display: "flex", gap: 16, marginTop: 24 }}>
-          <div style={cardStyle}>
-            <h2>{stats.totalManifests}</h2>
-            <p>Total Manifests</p>
+      <main className="main">
+        <div className="page-header">
+          <h1 className="page-title">Dashboard</h1>
+          <p className="page-subtitle">
+            {new Date().toLocaleDateString(undefined, {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
+        </div>
+
+        <div className="stat-grid">
+          <div className="stat-card">
+            <div className="stat-value">{stats.totalManifests}</div>
+            <div className="stat-label">Total manifests</div>
           </div>
-          <div style={cardStyle}>
-            <h2>{stats.totalBills}</h2>
-            <p>Total Bills</p>
+          <div className="stat-card">
+            <div className="stat-value">{stats.totalBills}</div>
+            <div className="stat-label">Total bills</div>
           </div>
-          <div style={cardStyle}>
-            <h2 style={{ color: "green" }}>{stats.scannedCount}</h2>
-            <p>Scan Finished</p>
+          <div className="stat-card">
+            <div className="stat-value success">{stats.scannedCount}</div>
+            <div className="stat-label">Scan finished</div>
           </div>
-          <div style={cardStyle}>
-            <h2 style={{ color: "orange" }}>{stats.pendingCount}</h2>
-            <p>Scan Pending (Overages)</p>
+          <div className="stat-card">
+            <div className="stat-value danger">{stats.pendingCount}</div>
+            <div className="stat-label">Scan pending (overages)</div>
           </div>
         </div>
       </main>

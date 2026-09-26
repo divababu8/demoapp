@@ -9,7 +9,6 @@ export default function OveragesPage() {
 
   useEffect(() => {
     async function load() {
-      // Uses the manifest_overages SQL view (last 7 days rollup)
       const { data } = await supabase
         .from("manifest_overages")
         .select("*")
@@ -29,38 +28,44 @@ export default function OveragesPage() {
   }, []);
 
   return (
-    <div style={{ display: "flex" }}>
+    <div className="app-shell">
       <Sidebar />
-      <main style={{ flex: 1, padding: 24 }}>
-        <h1>Overages (last 7 days)</h1>
-        <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 16 }}>
-          <thead>
-            <tr>
-              <th style={thStyle}>Manifest #</th>
-              <th style={thStyle}>Upload Date</th>
-              <th style={thStyle}>Total Bills</th>
-              <th style={thStyle}>Scanned</th>
-              <th style={thStyle}>Overage (Not Scanned)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.manifest_id}>
-                <td style={tdStyle}>{r.manifest_number}</td>
-                <td style={tdStyle}>{new Date(r.upload_date).toLocaleString()}</td>
-                <td style={tdStyle}>{r.total_bills}</td>
-                <td style={tdStyle}>{r.scanned_count}</td>
-                <td style={{ ...tdStyle, color: r.pending_count > 0 ? "red" : "green", fontWeight: 700 }}>
-                  {r.pending_count}
-                </td>
+      <main className="main">
+        <div className="page-header">
+          <h1 className="page-title">Overages</h1>
+          <p className="page-subtitle">Manifests from the last 7 days, with bills still pending scan.</p>
+        </div>
+
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Manifest #</th>
+                <th>Upload Date</th>
+                <th>Total Bills</th>
+                <th>Scanned</th>
+                <th>Overage (Not Scanned)</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.manifest_id}>
+                  <td className="mono">{r.manifest_number}</td>
+                  <td>{new Date(r.upload_date).toLocaleString()}</td>
+                  <td>{r.total_bills}</td>
+                  <td>{r.scanned_count}</td>
+                  <td>
+                    <span className={`badge ${r.pending_count > 0 ? "badge-pending" : "badge-scanned"}`}>
+                      {r.pending_count}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.length === 0 && <p className="empty-note">No manifests in the last 7 days.</p>}
+        </div>
       </main>
     </div>
   );
 }
-
-const thStyle: React.CSSProperties = { border: "1px solid #eee", padding: 8, background: "#fafafa", textAlign: "left" };
-const tdStyle: React.CSSProperties = { border: "1px solid #f5f5f5", padding: 8 };

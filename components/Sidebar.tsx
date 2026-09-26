@@ -23,26 +23,27 @@ export default function Sidebar() {
   }
 
   return (
-    <nav style={{ width: 200, borderRight: "1px solid #eee", height: "100vh", padding: 16, display: "flex", flexDirection: "column" }}>
-      <h3 style={{ marginBottom: 20 }}>Manifest App</h3>
+    <nav className="sidebar">
+      <div className="sidebar-brand">
+        <span className="sidebar-mark">MF</span>
+        <span>
+          <span className="sidebar-brand-text">Manifest</span>
+          <br />
+          <span className="sidebar-brand-sub">scanning desk</span>
+        </span>
+      </div>
+
       {links.map((l) => (
         <Link
           key={l.href}
           href={l.href}
-          style={{
-            display: "block",
-            padding: "8px 0",
-            fontWeight: pathname === l.href ? 700 : 400,
-            color: pathname === l.href ? "#0070f3" : "#333",
-          }}
+          className={`nav-link${pathname === l.href ? " active" : ""}`}
         >
           {l.label}
         </Link>
       ))}
-      <button
-        onClick={handleLogout}
-        style={{ marginTop: "auto", padding: 8, cursor: "pointer" }}
-      >
+
+      <button onClick={handleLogout} className="sidebar-logout">
         Logout
       </button>
     </nav>

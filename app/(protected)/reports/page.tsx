@@ -25,8 +25,6 @@ export default function ReportsPage() {
 
   async function loadReport() {
     setLoading(true);
-    // manifest_report view already rolls up bills/scanned/pending/search
-    // counts per manifest — this just applies the admin's chosen date range.
     const { data, error } = await supabase
       .from("manifest_report")
       .select("*")
@@ -81,7 +79,7 @@ export default function ReportsPage() {
       body: tableData,
       startY: 28,
       styles: { fontSize: 9 },
-      headStyles: { fillColor: [0, 112, 243] },
+      headStyles: { fillColor: [14, 107, 92] },
     });
 
     doc.save(`Manifest_Report_${dateFrom}_to_${dateTo}.pdf`);
@@ -98,69 +96,75 @@ export default function ReportsPage() {
   );
 
   return (
-    <div style={{ display: "flex" }}>
+    <div className="app-shell">
       <Sidebar />
-      <main style={{ flex: 1, padding: 24 }}>
-        <h1>Reports</h1>
-        <p style={{ color: "#666" }}>
-          End-of-day export: manifests, bill counts, scan progress, and total search attempts per manifest.
-        </p>
+      <main className="main">
+        <div className="page-header">
+          <h1 className="page-title">Reports</h1>
+          <p className="page-subtitle">
+            End-of-day export — manifests, bill counts, scan progress, and total search attempts.
+          </p>
+        </div>
 
-        <div style={{ display: "flex", gap: 12, alignItems: "end", margin: "16px 0" }}>
-          <div>
-            <label>From</label><br />
+        <div className="filter-bar">
+          <div className="field">
+            <label>From</label>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </div>
-          <div>
-            <label>To</label><br />
+          <div className="field">
+            <label>To</label>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
-          <button onClick={loadReport}>{loading ? "Loading..." : "Apply"}</button>
-          <button onClick={exportExcel} disabled={rows.length === 0}>
+          <button onClick={loadReport} className="btn btn-outline">
+            {loading ? "Loading…" : "Apply"}
+          </button>
+          <button onClick={exportExcel} disabled={rows.length === 0} className="btn btn-primary">
             Export Excel
           </button>
-          <button onClick={exportPdf} disabled={rows.length === 0}>
+          <button onClick={exportPdf} disabled={rows.length === 0} className="btn btn-outline">
             Export PDF
           </button>
         </div>
 
-        <table style={{ borderCollapse: "collapse", width: "100%" }}>
-          <thead>
-            <tr>
-              {columns.map((c) => (
-                <th key={c} style={thStyle}>{c}</th>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                {columns.map((c) => (
+                  <th key={c}>{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.manifest_id}>
+                  <td className="mono">{r.manifest_number}</td>
+                  <td>{new Date(r.upload_date).toLocaleString()}</td>
+                  <td>{r.total_bills}</td>
+                  <td>{r.scanned_count}</td>
+                  <td>
+                    <span className={`badge ${r.pending_count > 0 ? "badge-pending" : "badge-scanned"}`}>
+                      {r.pending_count}
+                    </span>
+                  </td>
+                  <td>{r.total_search_count}</td>
+                </tr>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.manifest_id}>
-                <td style={tdStyle}>{r.manifest_number}</td>
-                <td style={tdStyle}>{new Date(r.upload_date).toLocaleString()}</td>
-                <td style={tdStyle}>{r.total_bills}</td>
-                <td style={tdStyle}>{r.scanned_count}</td>
-                <td style={{ ...tdStyle, color: r.pending_count > 0 ? "red" : "green" }}>{r.pending_count}</td>
-                <td style={tdStyle}>{r.total_search_count}</td>
-              </tr>
-            ))}
-            {rows.length > 0 && (
-              <tr style={{ fontWeight: 700, borderTop: "2px solid #333" }}>
-                <td style={tdStyle}>Total ({rows.length} manifests)</td>
-                <td style={tdStyle}></td>
-                <td style={tdStyle}>{totals.bills}</td>
-                <td style={tdStyle}>{totals.scanned}</td>
-                <td style={tdStyle}>{totals.pending}</td>
-                <td style={tdStyle}>{totals.searches}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-
-        {rows.length === 0 && !loading && <p style={{ color: "#999", marginTop: 16 }}>No manifests in this date range.</p>}
+              {rows.length > 0 && (
+                <tr className="totals-row">
+                  <td>Total ({rows.length} manifests)</td>
+                  <td></td>
+                  <td>{totals.bills}</td>
+                  <td>{totals.scanned}</td>
+                  <td>{totals.pending}</td>
+                  <td>{totals.searches}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {rows.length === 0 && !loading && <p className="empty-note">No manifests in this date range.</p>}
+        </div>
       </main>
     </div>
   );
 }
-
-const thStyle: React.CSSProperties = { border: "1px solid #eee", padding: 8, background: "#fafafa", textAlign: "left" };
-const tdStyle: React.CSSProperties = { border: "1px solid #f5f5f5", padding: 8 };

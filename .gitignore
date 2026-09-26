@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# next.js build output
+.next/
+out/
+
+# environment variables (contains real Supabase keys — never commit)
+.env.local
+.env*.local
+
+# supabase local dev
+supabase/.temp/
+
+# misc
+.DS_Store
+*.log
