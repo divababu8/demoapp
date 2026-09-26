@@ -1,35 +1,273 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-// Wraps Dashboard, Shipments, Overages, Upload, Scanning.
-// No valid session -> immediately redirected to /login, page content never renders.
-// Also listens for logout/session-expiry mid-session and redirects then too.
-export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
+interface NavItem {
+  href: string;
+  label: string;
+  icon: string;
+  section: Section;
+}
+
+type Section = "ops" | "data";
+
+const NAV: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: "grid",   section: "ops"  },
+  { href: "/scanning",  label: "Scanning",  icon: "scan",   section: "ops"  },
+  { href: "/shipments", label: "Shipments", icon: "truck",  section: "ops"  },
+  { href: "/overages",  label: "Overages",  icon: "alert",  section: "ops"  },
+  { href: "/upload",    label: "Upload",    icon: "upload", section: "data" },
+  { href: "/reports",   label: "Reports",   icon: "chart",  section: "data" },
+];
+
+const SECTION_LABEL: Record<Section, string> = {
+  ops:  "Operations",
+  data: "Data",
+};
+
+export default function Sidebar({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const pathname = usePathname();
   const router = useRouter();
-  const [sessionChecked, setSessionChecked] = useState(false);
+  const [email, setEmail] = useState<string>("");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        router.replace("/login");
-      } else {
-        setSessionChecked(true);
-      }
-    });
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ""));
+  }, []);
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) router.replace("/login");
-    });
+  // Close mobile drawer whenever the route changes
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
-    return () => listener.subscription.unsubscribe();
-  }, [router]);
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.replace("/login");
+  }
 
-  // Render nothing until the session check completes — prevents any
-  // protected content from flashing on screen before the redirect fires.
-  if (!sessionChecked) return null;
+  const sections: Section[] = ["ops", "data"];
 
-  return <>{children}</>;
+  return (
+    <>
+      {/* Mobile hamburger */}
+      <button
+        className="sidebar-mobile-toggle"
+        onClick={() => setMobileOpen((v) => !v)}
+        aria-label="Toggle navigation"
+        type="button"
+      >
+        <Icon name={mobileOpen ? "close" : "menu"} />
+      </button>
+
+      {/* Backdrop on mobile */}
+      {mobileOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      <aside
+        className={
+          "sidebar" +
+          (collapsed ? " collapsed" : "") +
+          (mobileOpen ? " mobile-open" : "")
+        }
+      >
+        <div className="sidebar-brand">
+          <div className="brand-mark">
+            <Icon name="box" />
+          </div>
+          {!collapsed && (
+            <div className="brand-text">
+              <div className="brand-title">Manifest</div>
+              <div className="brand-sub">Scanning Console</div>
+            </div>
+          )}
+          <button
+            className="sidebar-collapse-btn"
+            onClick={onToggle}
+            aria-label="Toggle sidebar"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            type="button"
+          >
+            <Icon name={collapsed ? "chevron-right" : "chevron-left"} />
+          </button>
+        </div>
+
+        <nav className="sidebar-nav">
+          {sections.map((section) => {
+            const items = NAV.filter((n) => n.section === section);
+            if (items.length === 0) return null;
+            return (
+              <div key={section}>
+                {!collapsed && (
+                  <div className="sidebar-section-label">{SECTION_LABEL[section]}</div>
+                )}
+                {items.map((item) => {
+                  const active =
+                    pathname === item.href ||
+                    pathname.startsWith(item.href + "/");
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={"sidebar-link" + (active ? " active" : "")}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <span className="sidebar-link-icon">
+                        <Icon name={item.icon} />
+                      </span>
+                      {!collapsed && <span>{item.label}</span>}
+                      {active && !collapsed && <span className="sidebar-link-dot" />}
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-live">
+            <span className="live-dot" />
+            {!collapsed && <span>Realtime connected</span>}
+          </div>
+
+          <div className="sidebar-user" title={email || "Signed in"}>
+            <div className="user-avatar">
+              {(email[0] ?? "U").toUpperCase()}
+            </div>
+            {!collapsed && (
+              <div className="user-meta">
+                <div className="user-email">{email || "Signed in"}</div>
+                <div className="user-role">Operator</div>
+              </div>
+            )}
+          </div>
+
+          <button
+            className="sidebar-logout"
+            onClick={handleLogout}
+            type="button"
+            title={collapsed ? "Sign out" : undefined}
+          >
+            <Icon name="logout" />
+            {!collapsed && <span>Sign out</span>}
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+/* =====================================================================
+   Inline SVG icon set — no external icon library needed.
+   Stroke inherits from `currentColor`, so it picks up parent color.
+   ===================================================================== */
+function Icon({ name }: { name: string }) {
+  const paths: Record<string, JSX.Element> = {
+    grid: (
+      <>
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </>
+    ),
+    scan: (
+      <>
+        <path d="M4 8V5a1 1 0 0 1 1-1h3" />
+        <path d="M16 4h3a1 1 0 0 1 1 1v3" />
+        <path d="M20 16v3a1 1 0 0 1-1 1h-3" />
+        <path d="M8 20H5a1 1 0 0 1-1-1v-3" />
+        <path d="M4 12h16" />
+      </>
+    ),
+    truck: (
+      <>
+        <rect x="1" y="7" width="13" height="9" rx="1.5" />
+        <path d="M14 10h4l3 3v3h-7z" />
+        <circle cx="6" cy="18" r="1.6" />
+        <circle cx="17" cy="18" r="1.6" />
+      </>
+    ),
+    alert: (
+      <>
+        <path d="M12 3 2 20h20L12 3z" />
+        <path d="M12 9v5" />
+        <circle cx="12" cy="17" r=".6" fill="currentColor" />
+      </>
+    ),
+    upload: (
+      <>
+        <path d="M12 17V5" />
+        <path d="m7 10 5-5 5 5" />
+        <path d="M4 19h16" />
+      </>
+    ),
+    chart: (
+      <>
+        <path d="M4 20V10" />
+        <path d="M10 20V4" />
+        <path d="M16 20v-7" />
+        <path d="M22 20H2" />
+      </>
+    ),
+    box: (
+      <>
+        <path d="m3 7 9-4 9 4-9 4-9-4z" />
+        <path d="M3 7v10l9 4 9-4V7" />
+        <path d="M12 11v10" />
+      </>
+    ),
+    logout: (
+      <>
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <path d="m16 17 5-5-5-5" />
+        <path d="M21 12H9" />
+      </>
+    ),
+    "chevron-left": <path d="m15 18-6-6 6-6" />,
+    "chevron-right": <path d="m9 18 6-6-6-6" />,
+    menu: (
+      <>
+        <path d="M3 6h18" />
+        <path d="M3 12h18" />
+        <path d="M3 18h18" />
+      </>
+    ),
+    close: (
+      <>
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </>
+    ),
+  };
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {paths[name] ?? null}
+    </svg>
+  );
 }
