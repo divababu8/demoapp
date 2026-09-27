@@ -79,7 +79,25 @@ const LABEL_MAP: Record<string, string> = {
   "Commit Time": "Commit Time",
 };
 
-/* Columns shown by default — keeps the table readable for 40+ columns. */
+/* Canonical column order — matches the real Excel template exactly, left
+   to right, so the table reflects the file's actual layout instead of an
+   alphabetically-sorted (and therefore scrambled-looking) column list.
+   "Tracking Number" is excluded here since it's rendered as the dedicated
+   AWB column, not a dynamic one. */
+const CANONICAL_COLUMN_ORDER = [
+  "Shpr Co.", "Shpr Name", "Shpr Addr", "Shpr City", "ShprState", "Shpr Ctry", "Shpr Zip",
+  "Recip Co.", "Recip Name", "Recip Addr", "Recip City", "Recip State", "Recip Ctry", "Recip Zip",
+  "Service", "Commit Date", "Commit Time", "Shpr Phone", "Recip Phone", "Shpr Ref Notes",
+  "No Pieces", "Master Tracking Nbr", "Special Handling Codes", "Shpmt Weight", "UOM",
+  "HSCODE", "Commodity Desc", "Custom Value", "Currency", "VAT ID#/TIN#", "Remarks",
+  "CountryofOriginCoded", "CertificateNumber", "TransactionType", "ImporterCode",
+  "INCOTERMSCoded", "fright Costs", "ExemptionTypeCoded", "ApprovalNumber",
+  "SettlementIndicator", "Brand", "Model", "MOPHRegNo", "PaymentMode", "DecSubmitType",
+];
+
+/* Columns shown by default before "Show all columns" is clicked — keeps
+   the table readable at a glance for 40+ columns without hiding data;
+   the toggle below defaults to showing everything on page load. */
 const DEFAULT_VISIBLE = new Set<string>([
   "Service",
   "No Pieces",
@@ -150,7 +168,10 @@ export default function ShipmentsPage() {
   const [rows, setRows] = useState<ShipmentRow[]>([]);
   const [manifests, setManifests] = useState<ManifestOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAllColumns, setShowAllColumns] = useState(false);
+  // Defaults to true so every uploaded column is visible on page load —
+  // previously this defaulted to false and only 8 of ~42 columns showed
+  // until the user found and clicked "Show all columns".
+  const [showAllColumns, setShowAllColumns] = useState(true);
 
   /* ---- filters ---- */
   const [dateFrom, setDateFrom] = useState(todayISO());
@@ -218,13 +239,24 @@ export default function ShipmentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, manifestFilter, statusFilter]);
 
-  /* Realtime: refresh on any bills change */
+  /* Realtime: refresh on any bills change, debounced. Each reload here
+     re-fetches up to 2000 rows with every column, so without debouncing,
+     rapid-fire scans (2 people scanning) would trigger that full reload
+     on every single row change — this batches a burst into one reload
+     shortly after things settle. */
   useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    function scheduleReload() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadRows, 350);
+    }
+
     const ch = supabase
       .channel("shipments-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, loadRows)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, scheduleReload)
       .subscribe();
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -273,13 +305,26 @@ export default function ShipmentsPage() {
 
   /* ---------- derived: extra columns ---------- */
   const allExtraKeys = useMemo(() => {
-    const keys = new Set<string>();
+    const present = new Set<string>();
     filtered.forEach((r) =>
-      Object.keys(r.extra_data ?? {}).forEach((k) => keys.add(k))
+      Object.keys(r.extra_data ?? {}).forEach((k) => present.add(k))
     );
-    // Flight column is rendered explicitly — remove from dynamic block
-    FLIGHT_KEYS.forEach((k) => keys.delete(k));
-    return Array.from(keys).sort();
+    // Flight and Airport are both rendered as their own dedicated columns
+    // above — exclude both from the dynamic list so they don't also show
+    // up a second time further right. (Previously only Flight was
+    // excluded, so "Recip Ctry" could appear twice.)
+    FLIGHT_KEYS.forEach((k) => present.delete(k));
+    AIRPORT_KEYS.forEach((k) => present.delete(k));
+
+    // Order by the real Excel column order, not alphabetically — keeps the
+    // table matching the file's actual left-to-right layout. Any column
+    // present in the data but not in the canonical list (e.g. a future
+    // template change) is appended at the end rather than silently dropped.
+    const known = CANONICAL_COLUMN_ORDER.filter((k) => present.has(k));
+    const unknown = Array.from(present).filter(
+      (k) => !CANONICAL_COLUMN_ORDER.includes(k)
+    );
+    return [...known, ...unknown];
   }, [filtered]);
 
   const visibleExtraKeys = useMemo(
@@ -518,30 +563,17 @@ export default function ShipmentsPage() {
             <thead>
               <tr>
                 {/* Sticky col 1: Manifest # */}
-                <th
-                  style={{
-                    position: "sticky",
-                    left: 0,
-                    zIndex: 3,
-                    background: "var(--header-bg)",
-                    minWidth: 180,
-                  }}
-                >
+                <th className="sticky-col" style={{ left: 0, minWidth: 180 }}>
                   Manifest #
                 </th>
                 <th>Uploaded</th>
                 <th>Flight No</th>
                 <th>Airport</th>
 
-                {/* Sticky col 2: AWB */}
+                {/* Sticky col 2: AWB (last frozen column — gets the divider shadow) */}
                 <th
-                  style={{
-                    position: "sticky",
-                    left: 180,
-                    zIndex: 3,
-                    background: "var(--header-bg)",
-                    minWidth: 140,
-                  }}
+                  className="sticky-col sticky-col-divider"
+                  style={{ left: 180, minWidth: 140 }}
                 >
                   AWB Number
                 </th>
@@ -567,15 +599,7 @@ export default function ShipmentsPage() {
               {!loading &&
                 filtered.map((r) => (
                   <tr key={r.id}>
-                    <td
-                      className="mono"
-                      style={{
-                        position: "sticky",
-                        left: 0,
-                        zIndex: 2,
-                        background: "var(--surface)",
-                      }}
-                    >
+                    <td className="mono sticky-col" style={{ left: 0 }}>
                       {r.manifest_number}
                     </td>
                     <td>{fmtDateTime(r.manifest_upload_date)}</td>
@@ -583,13 +607,8 @@ export default function ShipmentsPage() {
                     <td>{getAirport(r)}</td>
 
                     <td
-                      className="mono"
-                      style={{
-                        position: "sticky",
-                        left: 180,
-                        zIndex: 2,
-                        background: "var(--surface)",
-                      }}
+                      className="mono sticky-col sticky-col-divider"
+                      style={{ left: 180 }}
                     >
                       {r.awb_number}
                     </td>

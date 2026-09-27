@@ -65,26 +65,20 @@ export default function OveragesPage() {
   async function load() {
     setLoading(true);
 
-    const { data: reports } = await supabase
-      .from("manifest_overages")
-      .select("*")
-      .order("upload_date", { ascending: true });
-
-    // Pull oldest pending bill timestamp per manifest to compute overage
-    const { data: pendingBills } = await supabase
-      .from("bills")
-      .select("manifest_id, created_at")
-      .eq("scan_status", "pending")
-      .order("created_at", { ascending: true });
+    // Both queries fire together, and the pending-age lookup now pulls one
+    // tiny aggregated row per manifest (manifest_pending_age view) instead
+    // of every pending bill in the system.
+    const [reportsRes, pendingAgeRes] = await Promise.all([
+      supabase.from("manifest_overages").select("*").order("upload_date", { ascending: true }),
+      supabase.from("manifest_pending_age").select("*"),
+    ]);
 
     const oldestByManifest = new Map<string, string>();
-    (pendingBills ?? []).forEach((b: any) => {
-      if (!oldestByManifest.has(b.manifest_id)) {
-        oldestByManifest.set(b.manifest_id, b.created_at);
-      }
+    (pendingAgeRes.data ?? []).forEach((r: any) => {
+      oldestByManifest.set(r.manifest_id, r.oldest_pending_at);
     });
 
-    const enriched: OverageRow[] = (reports ?? []).map((r: any) => ({
+    const enriched: OverageRow[] = (reportsRes.data ?? []).map((r: any) => ({
       ...r,
       oldest_pending_at: oldestByManifest.get(r.manifest_id) ?? null,
     }));
@@ -97,16 +91,25 @@ export default function OveragesPage() {
   useEffect(() => {
     load();
 
+    // Debounced so a burst of scans (2 people scanning) triggers one
+    // reload shortly after things settle, not one reload per row change.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    function scheduleReload() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(load, 350);
+    }
+
     const ch = supabase
       .channel("overages-live")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bills" },
-        load
+        scheduleReload
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(ch);
     };
   }, []);

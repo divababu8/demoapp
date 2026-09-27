@@ -46,52 +46,71 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<string>("connecting");
 
+  // Small "previous data" filter: 0 = today, 1 = yesterday, etc. Only
+  // changes the KPI cards / hourly chart's day window — the manifest
+  // table and all-time summary below always show everything regardless.
+  const [dayOffset, setDayOffset] = useState(0);
+
   /* ---------- realtime + initial load ---------- */
   useEffect(() => {
     let isMounted = true;
 
-    async function loadAll() {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const startIso = start.toISOString();
-      const endIso = new Date().toISOString();
-
-      const { data: reportRows } = await supabase
-        .from("manifest_report")
-        .select("*");
-
-      const { data: todayBills } = await supabase
-        .from("bills")
-        .select("id, manifest_id, scan_status, created_at, scanned_at")
-        .gte("created_at", startIso)
-        .lte("created_at", endIso);
-
-      const { data: pendingBills } = await supabase
-        .from("bills")
-        .select("manifest_id, created_at")
-        .eq("scan_status", "pending")
-        .order("created_at", { ascending: true });
+    async function loadAll(rangeStartIso: string, rangeEndIso: string) {
+      // All 3 queries fire together instead of one-after-another — this
+      // alone cuts the round-trip time roughly to a third of what it was.
+      const [reportRes, billsRes, pendingAgeRes] = await Promise.all([
+        supabase.from("manifest_report").select("*"),
+        supabase
+          .from("bills")
+          .select("id, manifest_id, scan_status, created_at, scanned_at")
+          .gte("created_at", rangeStartIso)
+          .lte("created_at", rangeEndIso),
+        // Tiny aggregated view (1 row per manifest) instead of downloading
+        // every pending bill row just to find the oldest one in JS.
+        supabase.from("manifest_pending_age").select("*"),
+      ]);
 
       if (!isMounted) return;
 
       const oldestByManifest = new Map<string, string>();
-      (pendingBills ?? []).forEach((b: any) => {
-        if (!oldestByManifest.has(b.manifest_id)) {
-          oldestByManifest.set(b.manifest_id, b.created_at);
-        }
+      (pendingAgeRes.data ?? []).forEach((r: any) => {
+        oldestByManifest.set(r.manifest_id, r.oldest_pending_at);
       });
 
-      const enriched: ManifestRow[] = (reportRows ?? []).map((r: any) => ({
+      const enriched: ManifestRow[] = (reportRes.data ?? []).map((r: any) => ({
         ...r,
         oldest_pending_at: oldestByManifest.get(r.manifest_id) ?? null,
       }));
 
       setManifests(enriched);
-      setBills(todayBills ?? []);
+      setBills(billsRes.data ?? []);
       setLoading(false);
     }
 
-    loadAll();
+    function currentRange() {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - dayOffset);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      return { startIso: start.toISOString(), endIso: end.toISOString() };
+    }
+
+    // Debounces bursty realtime events (e.g. 2 scanners firing rapid scans)
+    // so a flurry of changes triggers one reload shortly after things
+    // settle, instead of a full reload on every single row change.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    function scheduleReload() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const { startIso, endIso } = currentRange();
+        loadAll(startIso, endIso);
+      }, 350);
+    }
+
+    // Initial load runs immediately (no debounce) so the page doesn't sit blank
+    const { startIso, endIso } = currentRange();
+    loadAll(startIso, endIso);
 
     // Unique channel name to survive React Strict Mode double-mount + Fast Refresh
     const channelName = `dashboard-live-${Math.random()
@@ -105,7 +124,7 @@ export default function DashboardPage() {
         { event: "*", schema: "public", table: "bills" },
         (payload) => {
           console.log("[dashboard] bills changed:", payload.eventType);
-          loadAll();
+          scheduleReload();
         }
       )
       .on(
@@ -113,7 +132,7 @@ export default function DashboardPage() {
         { event: "*", schema: "public", table: "manifests" },
         (payload) => {
           console.log("[dashboard] manifests changed:", payload.eventType);
-          loadAll();
+          scheduleReload();
         }
       )
       .subscribe((status) => {
@@ -123,9 +142,10 @@ export default function DashboardPage() {
 
     return () => {
       isMounted = false;
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [dayOffset]);
 
   /* ---------- derived KPIs ---------- */
   const kpi = useMemo(() => {
@@ -179,6 +199,21 @@ export default function DashboardPage() {
       .slice(0, 5);
   }, [manifests]);
 
+  // Label for the day currently selected by the KPI date filter
+  const dayLabel = useMemo(() => {
+    if (dayOffset === 0) return "today";
+    if (dayOffset === 1) return "yesterday";
+    const d = new Date();
+    d.setDate(d.getDate() - dayOffset);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }, [dayOffset]);
+
+  const viewedDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - dayOffset);
+    return d;
+  }, [dayOffset]);
+
   /* ---------- render ---------- */
   return (
     <>
@@ -186,16 +221,33 @@ export default function DashboardPage() {
         <div>
           <h1 className="page-title">Dashboard</h1>
           <p className="page-subtitle">
-            {new Date().toLocaleDateString(undefined, {
+            {viewedDate.toLocaleDateString(undefined, {
               weekday: "long",
               year: "numeric",
               month: "long",
               day: "numeric",
             })}
-            {" · "}Live overview of today's manifests & scans
+            {" · "}Live overview of {dayLabel}'s manifests & scans
           </p>
         </div>
         <div className="page-header-actions">
+          {/* Small date filter — check today, yesterday, or a few days back
+              without leaving the Dashboard. Manifest table & all-time
+              summary below are unaffected; only the KPI cards + chart move. */}
+          <div className="field" style={{ marginBottom: 0 }}>
+            <select
+              value={dayOffset}
+              onChange={(e) => setDayOffset(Number(e.target.value))}
+              style={{ minWidth: 150 }}
+              aria-label="View KPI data for"
+            >
+              <option value={0}>Today</option>
+              <option value={1}>Yesterday</option>
+              <option value={2}>2 days ago</option>
+              <option value={3}>3 days ago</option>
+              <option value={7}>7 days ago</option>
+            </select>
+          </div>
           <span
             className="live-pill"
             title={`Realtime: ${realtimeStatus}`}
@@ -213,23 +265,23 @@ export default function DashboardPage() {
       <div className="kpi-grid">
         <KpiCard
           tone="primary"
-          label="Total Shipments (today)"
+          label={`Total Shipments (${dayLabel})`}
           value={kpi.totalShipments}
-          hint="All bills from all manifests today"
+          hint={`All bills from all manifests ${dayLabel}`}
           icon={<IconBox />}
         />
         <KpiCard
           tone="success"
           label="Scan Count"
           value={kpi.scanCount}
-          hint={`${kpi.completion.toFixed(1)}% of today's bills`}
+          hint={`${kpi.completion.toFixed(1)}% of ${dayLabel}'s bills`}
           icon={<IconCheck />}
         />
         <KpiCard
           tone="warning"
           label="Shortage (pending)"
           value={kpi.shortage}
-          hint="Bills not yet scanned today"
+          hint={`Bills not yet scanned ${dayLabel}`}
           icon={<IconClock />}
         />
         <KpiCard

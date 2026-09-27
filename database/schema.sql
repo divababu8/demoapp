@@ -101,6 +101,22 @@ group by m.id, m.manifest_number, m.upload_date, m.total_bills, sc.search_count;
 grant select on manifest_report to authenticated;
 
 -- =====================================================================
+-- 4c. PENDING-AGE VIEW — used by Dashboard + Overages to compute overage
+-- status ("pending > 10h"). Both pages previously downloaded EVERY pending
+-- bill row (manifest_id, created_at) to the browser just to find the
+-- oldest one per manifest in JavaScript — on every single realtime tick,
+-- across every scanner. This view does that aggregation in the database
+-- instead, so the browser only ever receives one small row per manifest.
+-- =====================================================================
+create or replace view manifest_pending_age as
+select manifest_id, min(created_at) as oldest_pending_at
+from bills
+where scan_status = 'pending'
+group by manifest_id;
+
+grant select on manifest_pending_age to authenticated;
+
+-- =====================================================================
 -- 5. ROW LEVEL SECURITY (RLS) — required by Supabase for client-side access
 -- Simple policy: any logged-in user can read/write. Tighten later if needed.
 -- =====================================================================

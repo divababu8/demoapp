@@ -267,50 +267,53 @@ export default function UploadPage() {
       today.setHours(0, 0, 0, 0);
       const todayIso = today.toISOString();
 
-      const { count: manifestCount } = await supabase
-        .from("manifests")
-        .select("*", { count: "exact", head: true });
-
-      const { count: billCount } = await supabase
-        .from("bills")
-        .select("*", { count: "exact", head: true });
-
-      const { count: todayCount } = await supabase
-        .from("bills")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", todayIso);
-
-      const { count: todayScanned } = await supabase
-        .from("bills")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", todayIso)
-        .eq("scan_status", "scanned");
+      // All 4 counts fire together instead of one-after-another.
+      const [manifestRes, billRes, todayRes, scannedRes] = await Promise.all([
+        supabase.from("manifests").select("*", { count: "exact", head: true }),
+        supabase.from("bills").select("*", { count: "exact", head: true }),
+        supabase.from("bills").select("*", { count: "exact", head: true }).gte("created_at", todayIso),
+        supabase
+          .from("bills")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", todayIso)
+          .eq("scan_status", "scanned"),
+      ]);
 
       setGlobalStats({
-        totalManifests: manifestCount ?? 0,
-        totalBills: billCount ?? 0,
-        billsToday: todayCount ?? 0,
-        scannedToday: todayScanned ?? 0,
+        totalManifests: manifestRes.count ?? 0,
+        totalBills: billRes.count ?? 0,
+        billsToday: todayRes.count ?? 0,
+        scannedToday: scannedRes.count ?? 0,
       });
     }
 
     loadGlobalStats();
+
+    // Debounced — this page listens to every bill change app-wide (e.g. a
+    // scanner on the Scanning page), so without this a rapid scan burst
+    // would re-run all 4 counts on every single row change.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    function scheduleReload() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadGlobalStats, 350);
+    }
 
     const ch = supabase
       .channel("upload-stats-live")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bills" },
-        loadGlobalStats
+        scheduleReload
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "manifests" },
-        loadGlobalStats
+        scheduleReload
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(ch);
     };
   }, []);

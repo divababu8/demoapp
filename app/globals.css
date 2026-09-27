@@ -450,32 +450,41 @@ input, select, button { font-family: inherit; }
   box-shadow: var(--shadow-card);
 }
 
+/* panel-header/title/sub work standalone inside a plain .panel (Dashboard,
+   Overages summary sections, etc.) — NOT only inside .panel-flush. This was
+   previously scoped to ".panel-flush .panel-header" only, so every plain
+   .panel using these classes rendered with no spacing/layout at all. */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.panel-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.panel-sub {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
 /* Dashboard variant: panel used as a card wrapper with its own
-   header/body sections. Opt-in via .panel-flush. */
+   header/body sections, no inherited padding. Opt-in via .panel-flush. */
 .panel-flush {
   padding: 0;
   overflow: hidden;
 }
 .panel-flush .panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding: 14px 20px;
   border-bottom: 1px solid var(--border);
-  gap: 12px;
-  flex-wrap: wrap;
+  margin-bottom: 0;
 }
 .panel-flush .panel-body { padding: 18px 20px; }
-.panel-flush .panel-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--ink);
-}
-.panel-flush .panel-sub {
-  font-size: 0.78rem;
-  color: var(--ink-muted);
-  margin-top: 2px;
-}
 
 .panel-badge {
   font-size: 0.78rem;
@@ -812,6 +821,29 @@ table.data-table {
 
 .mono { font-family: "IBM Plex Mono", monospace; }
 
+/* ---------- Frozen columns (Shipments table) ----------
+   Keeps Manifest # + AWB pinned on the left while ~40 more columns scroll
+   underneath. Background is state-aware (zebra stripe / hover) so a pinned
+   cell always matches the rest of its own row instead of staying white. */
+.sticky-col {
+  position: sticky;
+  z-index: 2;
+  background: var(--surface);
+}
+.data-table thead th.sticky-col {
+  z-index: 3;
+  background: var(--header-bg);
+}
+.data-table tbody tr:nth-child(even) td.sticky-col {
+  background: var(--row-alt);
+}
+.data-table tbody tr:hover td.sticky-col {
+  background: var(--accent-soft);
+}
+.sticky-col-divider {
+  box-shadow: 2px 0 6px rgba(35, 50, 66, 0.1);
+}
+
 .empty-note {
   color: var(--ink-muted);
   font-size: 0.875rem;
@@ -853,16 +885,30 @@ table.data-table {
   font-size: 0.78rem;
   color: var(--ink-muted);
   margin-bottom: 5px;
+  font-weight: 500;
 }
+/* Fixed 42px height on every filter control (input, select, and .btn below)
+   so a filter bar's fields and its action buttons all line up on one row,
+   regardless of each element's default padding/line-height. */
 .field input,
 .field select {
+  height: 42px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 8px 11px;
+  padding: 0 12px;
   font-size: 0.88rem;
+  font-family: inherit;
   background: #fff;
   color: var(--ink);
   min-width: 150px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.field select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%237a8894' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
 }
 .field input:focus,
 .field select:focus {
@@ -870,19 +916,28 @@ table.data-table {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+.field input::placeholder {
+  color: #a7b0b8;
+}
 
 /* =====================================================================
    BUTTONS
    ===================================================================== */
 
 .btn {
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
-  border-radius: 10px;
-  padding: 11px 22px;
+  border-radius: var(--radius-sm);
+  padding: 0 22px;
   font-size: 0.86rem;
   font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.15s ease;
 }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-dark); }
@@ -892,6 +947,7 @@ table.data-table {
   color: var(--accent-dark);
 }
 .btn-outline:hover { background: var(--accent); color: #fff; }
+.btn:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* =====================================================================
