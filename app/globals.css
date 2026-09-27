@@ -474,8 +474,17 @@ input, select, button { font-family: inherit; }
 }
 
 /* Dashboard variant: panel used as a card wrapper with its own
-   header/body sections, no inherited padding. Opt-in via .panel-flush. */
+   header/body sections, no inherited padding. Opt-in via .panel-flush.
+   Self-contained (includes the full card look) rather than requiring
+   `className="panel panel-flush"` everywhere — every actual usage in the
+   app (Overages, Reports, Upload, Scanning — 8 sections total) only ever
+   applied "panel-flush" alone, so without this they rendered with no
+   background, border, radius, or shadow at all: just an unstyled box. */
 .panel-flush {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
   padding: 0;
   overflow: hidden;
 }

@@ -154,18 +154,28 @@ export default function DashboardPage() {
     const pendingCount = bills.filter((b) => b.scan_status === "pending").length;
     const shortage = pendingCount;
 
-    const overageManifestIds = new Set(
-      manifests.filter(isOverage).map((m) => m.manifest_id)
-    );
-    const overage = bills.filter(
-      (b) =>
-        b.scan_status === "pending" && overageManifestIds.has(b.manifest_id)
-    ).length;
-
     const completion =
       totalShipments === 0 ? 0 : (scanCount / totalShipments) * 100;
-    return { totalShipments, scanCount, shortage, overage, completion };
-  }, [bills, manifests]);
+    return { totalShipments, scanCount, shortage, completion };
+  }, [bills]);
+
+  /* Overage is intentionally NOT derived from `bills` above — `bills` is
+     scoped to whichever single day the KPI date filter has selected, so a
+     manifest uploaded yesterday would never contribute here, and scanning
+     one of its bills today could never move this number. Overage instead
+     comes straight from `manifests` (which updates on every scan via
+     realtime regardless of upload date) and matches the Overages page's
+     own 7-day window, so both pages always agree. */
+  const overage = useMemo(() => {
+    const weekAgoMs = Date.now() - 7 * 24 * 3600 * 1000;
+    const recentOverageManifests = manifests.filter(
+      (m) => new Date(m.upload_date).getTime() >= weekAgoMs && isOverage(m)
+    );
+    return {
+      bills: recentOverageManifests.reduce((s, m) => s + m.pending_count, 0),
+      manifestCount: recentOverageManifests.length,
+    };
+  }, [manifests]);
 
   const allTime = useMemo(() => {
     const total = manifests.reduce((s, m) => s + m.total_bills, 0);
@@ -287,8 +297,8 @@ export default function DashboardPage() {
         <KpiCard
           tone="danger"
           label="Overage"
-          value={kpi.overage}
-          hint={`Pending > ${OVERAGE_HOURS}h`}
+          value={overage.bills}
+          hint={`Pending > ${OVERAGE_HOURS}h, last 7 days`}
           icon={<IconAlert />}
         />
       </div>
@@ -319,7 +329,7 @@ export default function DashboardPage() {
               <span className="dot dot-warning" /> Pending {kpi.shortage}
             </span>
             <span>
-              <span className="dot dot-danger" /> Overage {kpi.overage}
+              <span className="dot dot-danger" /> Overage {overage.bills}
             </span>
           </div>
         </section>
