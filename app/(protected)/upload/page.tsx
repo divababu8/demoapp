@@ -8,13 +8,8 @@ import { supabase, getAuthHeader } from "@/lib/supabaseClient";
    TYPES
    ===================================================================== */
 type FileStatusKind =
-  | "queued"
-  | "uploading"
-  | "created"
-  | "updated"
-  | "skipped"
-  | "rejected"
-  | "error";
+  | "queued" | "uploading" | "created" | "updated"
+  | "skipped" | "rejected" | "error";
 
 interface FileStatus {
   id: string;
@@ -22,7 +17,7 @@ interface FileStatus {
   size: number;
   status: FileStatusKind;
   message: string;
-  progress: number; // 0..100
+  progress: number;
   totalBills?: number;
   manifestNumber?: string;
 }
@@ -47,17 +42,11 @@ function formatBytes(bytes: number) {
 function fmtDateTime(iso: string | null | undefined) {
   if (!iso) return "–";
   return new Date(iso).toLocaleString(undefined, {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
+    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
   });
 }
 
-const STATUS_META: Record<
-  FileStatusKind,
-  { label: string; tone: "neutral" | "success" | "warning" | "danger" }
-> = {
+const STATUS_META: Record<FileStatusKind, { label: string; tone: "neutral" | "success" | "warning" | "danger" }> = {
   queued:    { label: "Queued",    tone: "neutral" },
   uploading: { label: "Uploading", tone: "neutral" },
   created:   { label: "Created",   tone: "success" },
@@ -76,7 +65,6 @@ export default function UploadPage() {
   const [recentLoading, setRecentLoading] = useState(true);
   const timerRefs = useRef<Map<string, number>>(new Map());
 
-  /* ---------- load recent manifests ---------- */
   async function loadRecent() {
     setRecentLoading(true);
     const { data } = await supabase
@@ -90,33 +78,22 @@ export default function UploadPage() {
 
   useEffect(() => {
     loadRecent();
-
     const ch = supabase
       .channel("upload-recent-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "manifests" },
-        loadRecent
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "manifests" }, loadRecent)
       .subscribe();
-
     return () => {
       supabase.removeChannel(ch);
-      // Clean up any ticking timers on unmount
       timerRefs.current.forEach((t) => window.clearInterval(t));
       timerRefs.current.clear();
     };
   }, []);
 
-  /* ---------- simulated progress ticker ---------- */
   function startProgressTicker(id: string) {
-    // Progress creeps toward 90% while waiting for the server response.
-    // Real completion snaps it to 100%.
     const tick = window.setInterval(() => {
       setResults((prev) =>
         prev.map((r) => {
-          if (r.id !== id) return r;
-          if (r.status !== "uploading") return r;
+          if (r.id !== id || r.status !== "uploading") return r;
           const next = Math.min(90, r.progress + Math.random() * 8 + 2);
           return { ...r, progress: next };
         })
@@ -127,27 +104,16 @@ export default function UploadPage() {
 
   function stopProgressTicker(id: string) {
     const t = timerRefs.current.get(id);
-    if (t !== undefined) {
-      window.clearInterval(t);
-      timerRefs.current.delete(id);
-    }
+    if (t !== undefined) { window.clearInterval(t); timerRefs.current.delete(id); }
   }
 
-  /* ---------- upload handler ---------- */
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const initial: FileStatus[] = acceptedFiles.map((f) => ({
       id: `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name: f.name,
-      size: f.size,
-      status: "uploading",
-      message: "Uploading…",
-      progress: 3,
+      name: f.name, size: f.size, status: "uploading", message: "Uploading…", progress: 3,
     }));
 
-    // Prepend new uploads so most recent appears at the top
     setResults((prev) => [...initial, ...prev]);
-
-    // Start progress tickers
     initial.forEach((f) => startProgressTicker(f.id));
 
     const authHeader = await getAuthHeader();
@@ -155,20 +121,12 @@ export default function UploadPage() {
     await Promise.all(
       acceptedFiles.map(async (file, idx) => {
         const entry = initial[idx];
-
         const formData = new FormData();
         formData.append("file", file);
-
         try {
-          const res = await fetch("/api/upload", {
-            method: "POST",
-            headers: authHeader,
-            body: formData,
-          });
+          const res = await fetch("/api/upload", { method: "POST", headers: authHeader, body: formData });
           const data = await res.json();
-
           stopProgressTicker(entry.id);
-
           setResults((prev) =>
             prev.map((r) =>
               r.id === entry.id
@@ -188,12 +146,7 @@ export default function UploadPage() {
           setResults((prev) =>
             prev.map((r) =>
               r.id === entry.id
-                ? {
-                    ...r,
-                    status: "error",
-                    message: err.message ?? "Upload failed.",
-                    progress: 100,
-                  }
+                ? { ...r, status: "error", message: err.message ?? "Upload failed.", progress: 100 }
                 : r
             )
           );
@@ -201,64 +154,29 @@ export default function UploadPage() {
       })
     );
 
-    // Refresh the recent table after the batch finishes
     loadRecent();
   }, []);
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    accept: {
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-    },
+    accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] },
     multiple: true,
-    noClick: true, // we'll wire the click manually for the browse button
+    noClick: true,
   });
 
-  /* ---------- aggregate session stats ---------- */
   const sessionStats = useMemo(() => {
     const uploads = results;
-    const manifestsUploaded = uploads.filter(
-      (r) => r.status === "created" || r.status === "updated"
-    ).length;
-    const billsUploaded = uploads.reduce(
-      (sum, r) => sum + (r.totalBills ?? 0),
-      0
-    );
-    const succeeded = uploads.filter(
-      (r) => r.status === "created" || r.status === "updated"
-    ).length;
+    const manifestsUploaded = uploads.filter((r) => r.status === "created" || r.status === "updated").length;
+    const billsUploaded = uploads.reduce((sum, r) => sum + (r.totalBills ?? 0), 0);
+    const succeeded = uploads.filter((r) => r.status === "created" || r.status === "updated").length;
     const skipped = uploads.filter((r) => r.status === "skipped").length;
-    const failed = uploads.filter(
-      (r) => r.status === "rejected" || r.status === "error"
-    ).length;
-    const inProgress = uploads.filter(
-      (r) => r.status === "uploading" || r.status === "queued"
-    ).length;
-    return {
-      manifestsUploaded,
-      billsUploaded,
-      succeeded,
-      skipped,
-      failed,
-      inProgress,
-      totalFiles: uploads.length,
-    };
+    const failed = uploads.filter((r) => r.status === "rejected" || r.status === "error").length;
+    const inProgress = uploads.filter((r) => r.status === "uploading" || r.status === "queued").length;
+    return { manifestsUploaded, billsUploaded, succeeded, skipped, failed, inProgress, totalFiles: uploads.length };
   }, [results]);
 
-  /* ---------- header stats (all-time) ---------- */
-  const allTime = useMemo(() => {
-    const totalManifests = recent.length
-      ? recent.reduce((s, r) => s + 1, 0)
-      : 0;
-    // Only counts the last 10 shown — full count via a lightweight query
-    return { totalManifests };
-  }, [recent]);
-
   const [globalStats, setGlobalStats] = useState({
-    totalManifests: 0,
-    totalBills: 0,
-    billsToday: 0,
-    scannedToday: 0,
+    totalManifests: 0, totalBills: 0, billsToday: 0, scannedToday: 0,
   });
 
   useEffect(() => {
@@ -267,16 +185,11 @@ export default function UploadPage() {
       today.setHours(0, 0, 0, 0);
       const todayIso = today.toISOString();
 
-      // All 4 counts fire together instead of one-after-another.
       const [manifestRes, billRes, todayRes, scannedRes] = await Promise.all([
         supabase.from("manifests").select("*", { count: "exact", head: true }),
         supabase.from("bills").select("*", { count: "exact", head: true }),
         supabase.from("bills").select("*", { count: "exact", head: true }).gte("created_at", todayIso),
-        supabase
-          .from("bills")
-          .select("*", { count: "exact", head: true })
-          .gte("created_at", todayIso)
-          .eq("scan_status", "scanned"),
+        supabase.from("bills").select("*", { count: "exact", head: true }).gte("created_at", todayIso).eq("scan_status", "scanned"),
       ]);
 
       setGlobalStats({
@@ -289,9 +202,6 @@ export default function UploadPage() {
 
     loadGlobalStats();
 
-    // Debounced — this page listens to every bill change app-wide (e.g. a
-    // scanner on the Scanning page), so without this a rapid scan burst
-    // would re-run all 4 counts on every single row change.
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     function scheduleReload() {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -300,16 +210,8 @@ export default function UploadPage() {
 
     const ch = supabase
       .channel("upload-stats-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bills" },
-        scheduleReload
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "manifests" },
-        scheduleReload
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "manifests" }, scheduleReload)
       .subscribe();
 
     return () => {
@@ -318,131 +220,75 @@ export default function UploadPage() {
     };
   }, []);
 
-  /* ---------- render ---------- */
   return (
     <>
       {/* ============ HEADER ============ */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Upload data</h1>
-          <p className="page-subtitle">
-            Drop manifest Excel files — each becomes a manifest automatically.
-          </p>
+          <p className="page-subtitle">Drop manifest Excel files — each becomes a manifest automatically.</p>
         </div>
         <div className="page-header-actions">
-          <span className="live-pill">
-            <span className="live-dot" /> Live
+          <span className="live-pill" style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            fontSize: '0.8rem', fontWeight: 600, color: 'var(--ink-muted)',
+            background: 'var(--surface)', padding: '8px 16px', borderRadius: '999px',
+            border: '1px solid var(--border)'
+          }}>
+            <span className="live-dot" style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} /> Live
           </span>
         </div>
       </div>
 
       {/* ============ KPI CARDS ============ */}
       <div className="kpi-grid">
-        <div className="kpi-card kpi-accent">
-          <div className="kpi-top">
-            <div className="kpi-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m3 7 9-4 9 4-9 4-9-4z" />
-                <path d="M3 7v10l9 4 9-4V7" />
-                <path d="M12 11v10" />
-              </svg>
-            </div>
-            <div className="kpi-value">{globalStats.totalManifests}</div>
-          </div>
-          <div className="kpi-label">Total manifests</div>
-          <div className="kpi-hint">All time</div>
-        </div>
-
-        <div className="kpi-card kpi-success">
-          <div className="kpi-top">
-            <div className="kpi-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="1" y="7" width="13" height="9" rx="1.5" />
-                <path d="M14 10h4l3 3v3h-7z" />
-                <circle cx="6" cy="18" r="1.6" />
-                <circle cx="17" cy="18" r="1.6" />
-              </svg>
-            </div>
-            <div className="kpi-value">{globalStats.totalBills}</div>
-          </div>
-          <div className="kpi-label">Total bills</div>
-          <div className="kpi-hint">All manifests combined</div>
-        </div>
-
-        <div className="kpi-card kpi-info">
-          <div className="kpi-top">
-            <div className="kpi-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 17V5" />
-                <path d="m7 10 5-5 5 5" />
-                <path d="M4 19h16" />
-              </svg>
-            </div>
-            <div className="kpi-value">{globalStats.billsToday}</div>
-          </div>
-          <div className="kpi-label">Bills uploaded today</div>
-          <div className="kpi-hint">
-            {globalStats.billsToday === 0
-              ? "No uploads yet"
-              : `${globalStats.scannedToday} scanned`}
-          </div>
-        </div>
-
-        <div className="kpi-card kpi-primary">
-          <div className="kpi-top">
-            <div className="kpi-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 20V10" />
-                <path d="M10 20V4" />
-                <path d="M16 20v-7" />
-                <path d="M22 20H2" />
-              </svg>
-            </div>
-            <div className="kpi-value">{sessionStats.totalFiles}</div>
-          </div>
-          <div className="kpi-label">Files this session</div>
-          <div className="kpi-hint">
-            {sessionStats.inProgress > 0
-              ? `${sessionStats.inProgress} in progress`
-              : sessionStats.totalFiles === 0
-              ? "Drop files to begin"
-              : "Batch complete"}
-          </div>
-        </div>
+        <KpiCard tone="primary" label="Total manifests" value={globalStats.totalManifests} hint="All time" icon={<IconBox />} />
+        <KpiCard tone="success" label="Total bills" value={globalStats.totalBills} hint="All manifests combined" icon={<IconTruck />} />
+        <KpiCard tone="info" label="Bills uploaded today" value={globalStats.billsToday}
+          hint={globalStats.billsToday === 0 ? "No uploads yet" : `${globalStats.scannedToday} scanned`}
+          icon={<IconUpload />} />
+        <KpiCard tone="purple" label="Files this session" value={sessionStats.totalFiles}
+          hint={sessionStats.inProgress > 0 ? `${sessionStats.inProgress} in progress` : sessionStats.totalFiles === 0 ? "Drop files to begin" : "Batch complete"}
+          icon={<IconChart />} />
       </div>
 
       {/* ============ DROPZONE ============ */}
       <div
         {...getRootProps()}
         className={`dropzone${isDragActive ? " active" : ""}`}
+        style={{
+          background: isDragActive ? 'var(--accent-indigo-soft)' : 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+          border: isDragActive ? '2px dashed var(--accent-indigo)' : '2px dashed var(--border)',
+          borderRadius: '20px',
+          padding: '64px 32px',
+          textAlign: 'center',
+          transition: 'all 0.2s',
+          cursor: 'pointer'
+        }}
       >
         <input {...getInputProps()} />
 
-        <div className="dropzone-icon">
-          <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 17V5" />
-            <path d="m7 10 5-5 5 5" />
-            <path d="M4 19h16" />
+        <div className="dropzone-icon" style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: '72px', height: '72px', borderRadius: '20px',
+          background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+          color: 'var(--accent-indigo)', marginBottom: '20px'
+        }}>
+          <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 17V5" /><path d="m7 10 5-5 5 5" /><path d="M4 19h16" />
           </svg>
         </div>
 
-        <p className="dropzone-title">
-          {isDragActive
-            ? "Drop the files here…"
-            : "Drag & drop your manifest Excel files here"}
+        <p className="dropzone-title" style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '8px' }}>
+          {isDragActive ? "Drop the files here…" : "Drag & drop your manifest Excel files here"}
         </p>
-        <p className="dropzone-sub">
-          Supports <strong>.xlsx</strong> — drop multiple files at once, no submit
-          button needed. Manifests and bills are created as soon as the upload
-          completes.
+        <p className="dropzone-sub" style={{ fontSize: '0.9rem', color: 'var(--ink-muted)', maxWidth: '520px', margin: '0 auto' }}>
+          Supports <strong>.xlsx</strong> — drop multiple files at once, no submit button needed.
+          Manifests and bills are created as soon as the upload completes.
         </p>
 
-        <div style={{ marginTop: 14 }}>
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={open}
-          >
+        <div style={{ marginTop: 24 }}>
+          <button type="button" className="btn btn-primary" onClick={open}>
             Browse files
           </button>
         </div>
@@ -476,13 +322,12 @@ export default function UploadPage() {
 
       {/* ============ PER-FILE PROGRESS LIST ============ */}
       {results.length > 0 && (
-        <div className="panel-flush" style={{ marginBottom: 18 }}>
+        <div className="panel" style={{ marginBottom: 24 }}>
           <div className="panel-header">
             <div>
               <div className="panel-title">This session</div>
               <div className="panel-sub">
-                {sessionStats.totalFiles} file
-                {sessionStats.totalFiles === 1 ? "" : "s"} · live upload status
+                {sessionStats.totalFiles} file{sessionStats.totalFiles === 1 ? "" : "s"} · live upload status
               </div>
             </div>
             <button
@@ -493,7 +338,6 @@ export default function UploadPage() {
                 timerRefs.current.forEach((t) => window.clearInterval(t));
                 timerRefs.current.clear();
               }}
-              style={{ padding: "7px 14px", fontSize: "0.78rem" }}
             >
               Clear
             </button>
@@ -509,9 +353,7 @@ export default function UploadPage() {
                     <div className="upload-progress-name">
                       <FileIcon />
                       <span className="mono">{r.name}</span>
-                      <span className="upload-progress-size">
-                        {formatBytes(r.size)}
-                      </span>
+                      <span className="upload-progress-size">{formatBytes(r.size)}</span>
                     </div>
                     <span className={`upload-pill upload-pill-${meta.tone}`}>
                       {isActive && <span className="mini-spinner" />}
@@ -529,24 +371,10 @@ export default function UploadPage() {
                   <div className="upload-progress-meta">
                     <span className="upload-progress-message">
                       {r.message}
-                      {r.manifestNumber && (
-                        <>
-                          {" · "}
-                          <span className="mono">{r.manifestNumber}</span>
-                        </>
-                      )}
-                      {r.totalBills !== undefined && (
-                        <>
-                          {" · "}
-                          <strong>{r.totalBills}</strong> bills
-                        </>
-                      )}
+                      {r.manifestNumber && <><span> · </span><span className="mono">{r.manifestNumber}</span></>}
+                      {r.totalBills !== undefined && <><span> · </span><strong>{r.totalBills}</strong> bills</>}
                     </span>
-                    {isActive && (
-                      <span className="upload-progress-pct">
-                        {Math.round(r.progress)}%
-                      </span>
-                    )}
+                    {isActive && <span className="upload-progress-pct">{Math.round(r.progress)}%</span>}
                   </div>
                 </div>
               );
@@ -556,23 +384,16 @@ export default function UploadPage() {
       )}
 
       {/* ============ RECENT UPLOADS TABLE ============ */}
-      <div className="panel-flush">
+      <div className="panel">
         <div className="panel-header">
           <div>
             <div className="panel-title">Recent uploads</div>
             <div className="panel-sub">Last 10 manifests ingested</div>
           </div>
-          <button
-            className="btn btn-outline"
-            type="button"
-            onClick={loadRecent}
-            style={{ padding: "7px 14px", fontSize: "0.78rem" }}
-          >
-            Refresh
-          </button>
+          <button className="btn btn-outline" type="button" onClick={loadRecent}>Refresh</button>
         </div>
 
-        <div className="table-wrap" style={{ border: "none", borderRadius: 0, boxShadow: "none" }}>
+        <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
@@ -584,33 +405,18 @@ export default function UploadPage() {
             </thead>
             <tbody>
               {recentLoading && (
-                <tr>
-                  <td colSpan={4}>
-                    <p className="empty-note">Loading…</p>
-                  </td>
-                </tr>
+                <tr><td colSpan={4}><p className="empty-note">Loading…</p></td></tr>
               )}
-              {!recentLoading &&
-                recent.map((m) => (
-                  <tr key={m.id}>
-                    <td className="mono">{m.manifest_number}</td>
-                    <td className="mono" style={{ color: "var(--ink-muted)" }}>
-                      {m.original_filename}
-                    </td>
-                    <td>
-                      <span className="badge badge-scanned">{m.total_bills}</span>
-                    </td>
-                    <td>{fmtDateTime(m.upload_date)}</td>
-                  </tr>
-                ))}
-              {!recentLoading && recent.length === 0 && (
-                <tr>
-                  <td colSpan={4}>
-                    <p className="empty-note">
-                      No manifests uploaded yet — drop your first file above.
-                    </p>
-                  </td>
+              {!recentLoading && recent.map((m) => (
+                <tr key={m.id}>
+                  <td className="mono">{m.manifest_number}</td>
+                  <td className="mono" style={{ color: "var(--ink-muted)" }}>{m.original_filename}</td>
+                  <td><span className="badge badge-scanned">{m.total_bills}</span></td>
+                  <td>{fmtDateTime(m.upload_date)}</td>
                 </tr>
+              ))}
+              {!recentLoading && recent.length === 0 && (
+                <tr><td colSpan={4}><p className="empty-note">No manifests uploaded yet — drop your first file above.</p></td></tr>
               )}
             </tbody>
           </table>
@@ -621,21 +427,55 @@ export default function UploadPage() {
 }
 
 /* =====================================================================
-   Inline icons
+   Sub-components
    ===================================================================== */
+function KpiCard({
+  tone, label, value, hint, icon,
+}: {
+  tone: "primary" | "success" | "info" | "purple" | "warning" | "danger";
+  label: string;
+  value: string | number;
+  hint: string;
+  icon: JSX.Element;
+}) {
+  return (
+    <div className={`kpi-card kpi-${tone}`}>
+      <div className="kpi-top">
+        <div className="kpi-icon">{icon}</div>
+        <div className="kpi-value">{value}</div>
+      </div>
+      <div>
+        <div className="kpi-label">{label}</div>
+        <div className="kpi-hint">{hint}</div>
+      </div>
+    </div>
+  );
+}
+
+/* Tiny inline icons */
+const iconProps = {
+  viewBox: "0 0 24 24", width: 22, height: 22, fill: "none",
+  stroke: "currentColor", strokeWidth: 2,
+  strokeLinecap: "round" as const, strokeLinejoin: "round" as const,
+};
+
+const IconBox = () => (
+  <svg {...iconProps}><path d="m3 7 9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7" /><path d="M12 11v10" /></svg>
+);
+const IconTruck = () => (
+  <svg {...iconProps}><rect x="1" y="7" width="13" height="9" rx="1.5" /><path d="M14 10h4l3 3v3h-7z" /><circle cx="6" cy="18" r="1.6" /><circle cx="17" cy="18" r="1.6" /></svg>
+);
+const IconUpload = () => (
+  <svg {...iconProps}><path d="M12 17V5" /><path d="m7 10 5-5 5 5" /><path d="M4 19h16" /></svg>
+);
+const IconChart = () => (
+  <svg {...iconProps}><path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20H2" /></svg>
+);
+
+/* File icon used in the progress list */
 function FileIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width="16"
-      height="16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ color: "var(--accent-dark)" }}
-    >
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--accent-indigo)" }}>
       <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
       <path d="M14 3v5h5" />
     </svg>

@@ -76,7 +76,8 @@ export default function Sidebar({
         }`}
       >
         <div className="sidebar-brand">
-          <div className="brand-mark">
+          {/* Changed to use accent-indigo for a vibrant pop against white */}
+          <div className="brand-mark" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: '#fff' }}>
             <Icon name="box" />
           </div>
           {!collapsed && (
@@ -90,6 +91,7 @@ export default function Sidebar({
             onClick={onToggle}
             aria-label="Collapse sidebar"
             title={collapsed ? "Expand" : "Collapse"}
+            style={{ color: 'var(--ink-muted)', background: 'var(--paper)' }}
           >
             <Icon name={collapsed ? "chevron-right" : "chevron-left"} />
           </button>
@@ -129,21 +131,24 @@ export default function Sidebar({
 
         <div className="sidebar-footer">
           <div className="sidebar-live">
-            <span className="live-dot" />
-            {!collapsed && <span>Realtime connected</span>}
+            <span className="live-dot" style={{ background: 'var(--success)' }} />
+            {!collapsed && <span style={{ color: 'var(--ink-muted)' }}>Realtime connected</span>}
           </div>
 
-          <div className="sidebar-user" title={email}>
-            <div className="user-avatar">{(email[0] ?? "U").toUpperCase()}</div>
+          <div className="sidebar-user" title={email} style={{ background: 'var(--paper)', border: '1px solid var(--border)' }}>
+            {/* Changed avatar to a soft indigo circle for a modern look */}
+            <div className="user-avatar" style={{ background: 'var(--accent-indigo-soft)', color: 'var(--accent-indigo)' }}>
+              {(email[0] ?? "U").toUpperCase()}
+            </div>
             {!collapsed && (
               <div className="user-meta">
-                <div className="user-email">{email || "Signed in"}</div>
-                <div className="user-role">Operator</div>
+                <div className="user-email" style={{ color: 'var(--ink)' }}>{email || "Signed in"}</div>
+                <div className="user-role" style={{ color: 'var(--ink-muted)' }}>Operator</div>
               </div>
             )}
           </div>
 
-          <button className="sidebar-logout" onClick={handleLogout}>
+          <button className="sidebar-logout" onClick={handleLogout} style={{ color: 'var(--ink-muted)', borderColor: 'var(--border)' }}>
             <Icon name="logout" />
             {!collapsed && <span>Sign out</span>}
           </button>
@@ -238,8 +243,8 @@ function Icon({ name }: { name: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="18"
-      height="18"
+      width="20" // Slightly increased from 18 for better balance
+      height="20"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"

@@ -1843,3 +1843,393 @@ table.data-table {
   height: 12px;
   border-width: 2px;
 }
+
+
+/* =====================================================================
+   MANIFEST SCANNING — DESIGN SYSTEM (Updated for Rich SaaS Look)
+   ===================================================================== */
+
+:root {
+  /* --- Core Palette --- */
+  --ink: #1e293b; /* Slate 800 */
+  --ink-muted: #64748b; /* Slate 500 */
+  --paper: #f8fafc; /* Slate 50 */
+  --surface: #ffffff;
+  --border: #e2e8f0; /* Slate 200 */
+  --border-soft: #f1f5f9; /* Slate 100 */
+
+  /* --- Vibrant Accents (Reference Matching) --- */
+  --accent-indigo: #6366f1;
+  --accent-indigo-soft: #e0e7ff;
+  --accent-teal: #14b8a6;
+  --accent-teal-soft: #ccfbf1;
+  --accent-pink: #ec4899;
+  --accent-pink-soft: #fce7f3;
+  --accent-orange: #f97316;
+  --accent-orange-soft: #ffedd5;
+  --accent-blue: #3b82f6;
+  --accent-blue-soft: #dbeafe;
+  --accent-purple: #8b5cf6;
+  --accent-purple-soft: #ede9fe;
+
+  --danger: #ef4444;
+  --danger-soft: #fee2e2;
+  --success: #10b981;
+  --success-soft: #d1fae5;
+  --warning: #f59e0b;
+  --warning-soft: #fef3c7;
+
+  /* --- Layout --- */
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  --sidebar-w: 260px;
+  --sidebar-w-collapsed: 80px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Rubik", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: "Rubik", sans-serif; font-weight: 700; color: var(--ink); margin: 0; }
+a { color: inherit; text-decoration: none; }
+input, select, button { font-family: inherit; }
+
+/* =====================================================================
+   APP SHELL & SIDEBAR (Keep existing sidebar logic but soften it)
+   ===================================================================== */
+
+.app-shell { display: flex; min-height: 100vh; background: var(--paper); }
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 36px 40px 60px;
+  margin-left: var(--sidebar-w);
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-collapsed .main { margin-left: var(--sidebar-w-collapsed); }
+
+@media (max-width: 900px) {
+  .main { margin-left: 0; padding: 80px 20px 40px; }
+}
+
+.sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 40;
+}
+.sidebar.collapsed { width: var(--sidebar-w-collapsed); }
+
+.sidebar-brand {
+  display: flex; align-items: center; gap: 12px;
+  padding: 24px 20px; border-bottom: 1px solid var(--border-soft);
+}
+.brand-mark {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--ink); color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.brand-title { font-size: 14px; font-weight: 700; color: var(--ink); }
+.brand-sub { font-size: 11px; color: var(--ink-muted); }
+
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; }
+.sidebar-link {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: var(--radius-sm);
+  color: var(--ink-muted); font-size: 14px; font-weight: 500;
+  transition: all 0.2s;
+}
+.sidebar-link:hover { background: var(--paper); color: var(--ink); }
+.sidebar-link.active { background: var(--accent-indigo-soft); color: var(--accent-indigo); font-weight: 600; }
+
+/* =====================================================================
+   PAGE HEADER
+   ===================================================================== */
+.page-header {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  gap: 16px; margin-bottom: 28px; flex-wrap: wrap;
+}
+.page-title { font-size: 1.75rem; letter-spacing: -0.02em; font-weight: 700; color: var(--ink); }
+.page-subtitle { color: var(--ink-muted); font-size: 0.95rem; margin-top: 4px; }
+
+/* =====================================================================
+   KPI CARDS (Vibrant & Rich)
+   ===================================================================== */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.kpi-card {
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+}
+.kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
+
+/* Vibrant Gradients matching reference */
+.kpi-primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
+.kpi-success { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); }
+.kpi-warning { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+.kpi-danger  { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+.kpi-info    { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+.kpi-purple  { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+
+.kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+
+.kpi-icon {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  color: #fff;
+}
+
+.kpi-value {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 2rem; font-weight: 700; line-height: 1;
+  letter-spacing: -0.02em;
+}
+.kpi-label {
+  font-size: 0.85rem; font-weight: 500;
+  opacity: 0.9; text-transform: uppercase; letter-spacing: 0.05em;
+  margin-top: 8px;
+}
+.kpi-hint { font-size: 0.75rem; opacity: 0.7; margin-top: 4px; }
+
+/* =====================================================================
+   PANELS (Clean & Spacious)
+   ===================================================================== */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 24px;
+}
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.panel-title { font-size: 1.1rem; font-weight: 700; color: var(--ink); }
+.panel-sub { font-size: 0.85rem; color: var(--ink-muted); margin-top: 2px; }
+.panel-badge {
+  font-size: 0.8rem; font-weight: 700;
+  background: var(--accent-indigo-soft); color: var(--accent-indigo);
+  padding: 6px 14px; border-radius: 999px;
+}
+
+/* =====================================================================
+   DATA TABLE (Rich & Clean)
+   ===================================================================== */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+table.data-table {
+  border-collapse: collapse; width: 100%; font-size: 0.9rem;
+}
+.data-table thead th {
+  text-align: left; padding: 16px 20px;
+  background: #f8fafc; /* Very light gray header */
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-muted); font-weight: 600;
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.data-table tbody tr { transition: background 0.15s ease; }
+.data-table tbody tr:hover { background: #f8fafc; }
+.data-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap; color: var(--ink);
+}
+.data-table tr:last-child td { border-bottom: none; }
+
+.mono { font-family: "IBM Plex Mono", monospace; font-weight: 500; }
+
+/* =====================================================================
+   BADGES (Modern Pill Style)
+   ===================================================================== */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600;
+}
+.badge-scanned  { background: var(--success-soft); color: #065f46; }
+.badge-pending  { background: var(--warning-soft); color: #92400e; }
+.badge-danger   { background: var(--danger-soft); color: #991b1b; }
+.badge-info     { background: var(--accent-blue-soft); color: #1e40af; }
+
+/* =====================================================================
+   PROGRESS & SPARKLINE (Updated)
+   ===================================================================== */
+.big-progress {
+  height: 12px; margin: 12px 0 8px;
+  background: var(--border-soft); border-radius: 999px; overflow: hidden;
+}
+.big-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-indigo), #818cf8);
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-legend {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  font-size: 0.85rem; color: var(--ink-muted); margin-top: 12px;
+}
+.progress-legend .dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px;
+}
+.dot-success { background: var(--success); }
+.dot-warning { background: var(--warning); }
+.dot-danger  { background: var(--danger); }
+
+.sparkline { display: flex; align-items: flex-end; gap: 4px; height: 100px; margin-top: 10px; }
+.sparkline-bar {
+  flex: 1; min-height: 4px;
+  background: linear-gradient(180deg, var(--accent-indigo), #a5b4fc);
+  border-radius: 4px 4px 2px 2px;
+  transition: opacity 0.2s, height 0.2s;
+}
+.sparkline-bar:hover { opacity: 0.8; }
+
+/* =====================================================================
+   TOP LIST (Dashboard)
+   ===================================================================== */
+.top-list { display: flex; flex-direction: column; gap: 12px; }
+.top-row {
+  padding: 16px; border-radius: var(--radius-sm);
+  background: var(--paper);
+  transition: background 0.2s;
+}
+.top-row:hover { background: #f1f5f9; }
+
+.top-row-main {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 10px;
+}
+.top-row-bar {
+  height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden;
+}
+.top-row-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-indigo), #818cf8);
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+.top-row-fill.danger { background: linear-gradient(90deg, var(--danger), #f87171); }
+.top-row-meta { font-size: 0.8rem; color: var(--ink-muted); margin-top: 8px; font-weight: 500; }
+
+/* =====================================================================
+   QUICK STATS STRIP (Dashboard)
+   ===================================================================== */
+.quick-stats {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px;
+  box-shadow: var(--shadow-card); margin-top: 24px;
+}
+@media (max-width: 900px) { .quick-stats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .quick-stats { grid-template-columns: 1fr; } }
+
+.quick-stat {
+  text-align: center; padding: 12px 8px;
+  border-radius: var(--radius-sm); background: var(--paper);
+}
+.quick-stat-value {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 1.4rem; font-weight: 700; color: var(--ink);
+}
+.quick-stat-label {
+  font-size: 0.75rem; color: var(--ink-muted);
+  margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.quick-success .quick-stat-value { color: var(--success); }
+.quick-warning .quick-stat-value { color: var(--warning); }
+.quick-primary .quick-stat-value { color: var(--accent-indigo); }
+.quick-neutral .quick-stat-value { color: var(--ink); }
+
+/* =====================================================================
+   FORMS & BUTTONS
+   ===================================================================== */
+.field label {
+  display: block; font-size: 0.8rem; color: var(--ink-muted);
+  margin-bottom: 6px; font-weight: 600;
+}
+.field input, .field select {
+  height: 44px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 0 14px;
+  font-size: 0.9rem; background: #fff; color: var(--ink);
+  min-width: 160px; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.field input:focus, .field select:focus {
+  outline: none; border-color: var(--accent-indigo);
+  box-shadow: 0 0 0 4px var(--accent-indigo-soft);
+}
+
+.btn {
+  height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: var(--radius-sm);
+  padding: 0 24px; font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.btn-primary { background: var(--ink); color: #fff; }
+.btn-primary:hover { background: #0f172a; transform: translateY(-1px); }
+.btn-outline {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--ink);
+}
+.btn-outline:hover { background: var(--paper); border-color: var(--ink-muted); }
+
+/* =====================================================================
+   MISC (Boot, Login, Empty States)
+   ===================================================================== */
+.boot-screen { display: grid; place-items: center; min-height: 100vh; background: var(--paper); }
+.boot-spinner {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 4px solid var(--border); border-top-color: var(--accent-indigo);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty-note {
+  color: var(--ink-muted); font-size: 0.9rem;
+  padding: 32px; text-align: center; font-style: italic;
+}

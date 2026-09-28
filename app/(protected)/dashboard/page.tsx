@@ -45,10 +45,6 @@ export default function DashboardPage() {
   const [bills, setBills] = useState<BillLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<string>("connecting");
-
-  // Small "previous data" filter: 0 = today, 1 = yesterday, etc. Only
-  // changes the KPI cards / hourly chart's day window — the manifest
-  // table and all-time summary below always show everything regardless.
   const [dayOffset, setDayOffset] = useState(0);
 
   /* ---------- realtime + initial load ---------- */
@@ -56,8 +52,6 @@ export default function DashboardPage() {
     let isMounted = true;
 
     async function loadAll(rangeStartIso: string, rangeEndIso: string) {
-      // All 3 queries fire together instead of one-after-another — this
-      // alone cuts the round-trip time roughly to a third of what it was.
       const [reportRes, billsRes, pendingAgeRes] = await Promise.all([
         supabase.from("manifest_report").select("*"),
         supabase
@@ -65,8 +59,6 @@ export default function DashboardPage() {
           .select("id, manifest_id, scan_status, created_at, scanned_at")
           .gte("created_at", rangeStartIso)
           .lte("created_at", rangeEndIso),
-        // Tiny aggregated view (1 row per manifest) instead of downloading
-        // every pending bill row just to find the oldest one in JS.
         supabase.from("manifest_pending_age").select("*"),
       ]);
 
@@ -96,9 +88,6 @@ export default function DashboardPage() {
       return { startIso: start.toISOString(), endIso: end.toISOString() };
     }
 
-    // Debounces bursty realtime events (e.g. 2 scanners firing rapid scans)
-    // so a flurry of changes triggers one reload shortly after things
-    // settle, instead of a full reload on every single row change.
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     function scheduleReload() {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -108,35 +97,16 @@ export default function DashboardPage() {
       }, 350);
     }
 
-    // Initial load runs immediately (no debounce) so the page doesn't sit blank
     const { startIso, endIso } = currentRange();
     loadAll(startIso, endIso);
 
-    // Unique channel name to survive React Strict Mode double-mount + Fast Refresh
-    const channelName = `dashboard-live-${Math.random()
-      .toString(36)
-      .slice(2, 9)}`;
+    const channelName = `dashboard-live-${Math.random().toString(36).slice(2, 9)}`;
 
     const channel = supabase
       .channel(channelName)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bills" },
-        (payload) => {
-          console.log("[dashboard] bills changed:", payload.eventType);
-          scheduleReload();
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "manifests" },
-        (payload) => {
-          console.log("[dashboard] manifests changed:", payload.eventType);
-          scheduleReload();
-        }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, () => scheduleReload())
+      .on("postgres_changes", { event: "*", schema: "public", table: "manifests" }, () => scheduleReload())
       .subscribe((status) => {
-        console.log("[dashboard] realtime status:", status);
         if (isMounted) setRealtimeStatus(status);
       });
 
@@ -153,19 +123,10 @@ export default function DashboardPage() {
     const scanCount = bills.filter((b) => b.scan_status === "scanned").length;
     const pendingCount = bills.filter((b) => b.scan_status === "pending").length;
     const shortage = pendingCount;
-
-    const completion =
-      totalShipments === 0 ? 0 : (scanCount / totalShipments) * 100;
+    const completion = totalShipments === 0 ? 0 : (scanCount / totalShipments) * 100;
     return { totalShipments, scanCount, shortage, completion };
   }, [bills]);
 
-  /* Overage is intentionally NOT derived from `bills` above — `bills` is
-     scoped to whichever single day the KPI date filter has selected, so a
-     manifest uploaded yesterday would never contribute here, and scanning
-     one of its bills today could never move this number. Overage instead
-     comes straight from `manifests` (which updates on every scan via
-     realtime regardless of upload date) and matches the Overages page's
-     own 7-day window, so both pages always agree. */
   const overage = useMemo(() => {
     const weekAgoMs = Date.now() - 7 * 24 * 3600 * 1000;
     const recentOverageManifests = manifests.filter(
@@ -182,16 +143,10 @@ export default function DashboardPage() {
     const scanned = manifests.reduce((s, m) => s + m.scanned_count, 0);
     const pending = manifests.reduce((s, m) => s + m.pending_count, 0);
     const searches = manifests.reduce((s, m) => s + m.total_search_count, 0);
-    return {
-      total,
-      scanned,
-      pending,
-      searches,
-      completion: total === 0 ? 0 : (scanned / total) * 100,
-    };
+    return { total, scanned, pending, searches, completion: total === 0 ? 0 : (scanned / total) * 100 };
   }, [manifests]);
 
-  /* ---------- charts (pure SVG, no chart lib) ---------- */
+  /* ---------- charts ---------- */
   const hourly = useMemo(() => {
     const buckets = new Array(24).fill(0);
     bills
@@ -204,12 +159,9 @@ export default function DashboardPage() {
   }, [bills]);
 
   const topManifests = useMemo(() => {
-    return [...manifests]
-      .sort((a, b) => b.pending_count - a.pending_count)
-      .slice(0, 5);
+    return [...manifests].sort((a, b) => b.pending_count - a.pending_count).slice(0, 5);
   }, [manifests]);
 
-  // Label for the day currently selected by the KPI date filter
   const dayLabel = useMemo(() => {
     if (dayOffset === 0) return "today";
     if (dayOffset === 1) return "yesterday";
@@ -232,18 +184,12 @@ export default function DashboardPage() {
           <h1 className="page-title">Dashboard</h1>
           <p className="page-subtitle">
             {viewedDate.toLocaleDateString(undefined, {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
+              weekday: "long", year: "numeric", month: "long", day: "numeric",
             })}
             {" · "}Live overview of {dayLabel}'s manifests & scans
           </p>
         </div>
         <div className="page-header-actions">
-          {/* Small date filter — check today, yesterday, or a few days back
-              without leaving the Dashboard. Manifest table & all-time
-              summary below are unaffected; only the KPI cards + chart move. */}
           <div className="field" style={{ marginBottom: 0 }}>
             <select
               value={dayOffset}
@@ -262,10 +208,13 @@ export default function DashboardPage() {
             className="live-pill"
             title={`Realtime: ${realtimeStatus}`}
             style={{
-              opacity: realtimeStatus === "SUBSCRIBED" ? 1 : 0.6,
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              fontSize: '0.8rem', fontWeight: 600, color: 'var(--ink-muted)',
+              background: 'var(--surface)', padding: '8px 16px', borderRadius: '999px',
+              border: '1px solid var(--border)'
             }}
           >
-            <span className="live-dot" />{" "}
+            <span className="live-dot" style={{ width: 8, height: 8, borderRadius: '50%', background: realtimeStatus === 'SUBSCRIBED' ? 'var(--success)' : 'var(--warning)' }} />{" "}
             {realtimeStatus === "SUBSCRIBED" ? "Live" : "Connecting…"}
           </span>
         </div>
@@ -304,7 +253,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ============ PROGRESS + CHARTS ============ */}
-      <div className="dash-two-col">
+      <div className="dash-two-col" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px', marginBottom: '24px' }}>
         <section className="panel">
           <div className="panel-header">
             <div>
@@ -316,21 +265,12 @@ export default function DashboardPage() {
             <div className="panel-badge">{kpi.completion.toFixed(1)}%</div>
           </div>
           <div className="big-progress">
-            <div
-              className="big-progress-fill"
-              style={{ width: `${kpi.completion}%` }}
-            />
+            <div className="big-progress-fill" style={{ width: `${kpi.completion}%` }} />
           </div>
           <div className="progress-legend">
-            <span>
-              <span className="dot dot-success" /> Scanned {kpi.scanCount}
-            </span>
-            <span>
-              <span className="dot dot-warning" /> Pending {kpi.shortage}
-            </span>
-            <span>
-              <span className="dot dot-danger" /> Overage {overage.bills}
-            </span>
+            <span><span className="dot dot-success" /> Scanned {kpi.scanCount}</span>
+            <span><span className="dot dot-warning" /> Pending {kpi.shortage}</span>
+            <span><span className="dot dot-danger" /> Overage {overage.bills}</span>
           </div>
         </section>
 
@@ -358,28 +298,18 @@ export default function DashboardPage() {
             <p className="empty-note">All caught up — no pending manifests.</p>
           )}
           {topManifests.map((m) => {
-            const pct =
-              m.total_bills === 0
-                ? 0
-                : (m.scanned_count / m.total_bills) * 100;
+            const pct = m.total_bills === 0 ? 0 : (m.scanned_count / m.total_bills) * 100;
             const over = isOverage(m);
             return (
               <div key={m.manifest_id} className="top-row">
                 <div className="top-row-main">
                   <span className="mono">{m.manifest_number}</span>
-                  <span
-                    className={`badge ${
-                      over ? "badge-danger" : "badge-pending"
-                    }`}
-                  >
+                  <span className={`badge ${over ? "badge-danger" : "badge-pending"}`}>
                     {over ? "Overage" : "Pending"}
                   </span>
                 </div>
                 <div className="top-row-bar">
-                  <div
-                    className={`top-row-fill${over ? " danger" : ""}`}
-                    style={{ width: `${pct}%` }}
-                  />
+                  <div className={`top-row-fill${over ? " danger" : ""}`} style={{ width: `${pct}%` }} />
                 </div>
                 <div className="top-row-meta">
                   {m.scanned_count}/{m.total_bills} · {m.pending_count} pending
@@ -422,19 +352,11 @@ export default function DashboardPage() {
                     <td>{new Date(m.upload_date).toLocaleString()}</td>
                     <td>{m.total_bills}</td>
                     <td>
-                      <span className="badge badge-scanned">
-                        {m.scanned_count}
-                      </span>
+                      <span className="badge badge-scanned">{m.scanned_count}</span>
                     </td>
                     <td>{m.total_search_count}</td>
                     <td>
-                      <span
-                        className={`badge ${
-                          m.pending_count > 0
-                            ? "badge-pending"
-                            : "badge-scanned"
-                        }`}
-                      >
+                      <span className={`badge ${m.pending_count > 0 ? "badge-pending" : "badge-scanned"}`}>
                         {m.pending_count}
                       </span>
                     </td>
@@ -442,9 +364,7 @@ export default function DashboardPage() {
                       {m.pending_count === 0 ? (
                         <span className="badge badge-scanned">Complete</span>
                       ) : over ? (
-                        <span className="badge badge-danger">
-                          Overage &gt;{OVERAGE_HOURS}h
-                        </span>
+                        <span className="badge badge-danger">Overage &gt;{OVERAGE_HOURS}h</span>
                       ) : (
                         <span className="badge badge-pending">In progress</span>
                       )}
@@ -454,18 +374,12 @@ export default function DashboardPage() {
               })}
               {!loading && manifests.length === 0 && (
                 <tr>
-                  <td colSpan={7}>
-                    <p className="empty-note">
-                      No manifests yet — upload one to begin.
-                    </p>
-                  </td>
+                  <td colSpan={7}><p className="empty-note">No manifests yet — upload one to begin.</p></td>
                 </tr>
               )}
               {loading && (
                 <tr>
-                  <td colSpan={7}>
-                    <p className="empty-note">Loading…</p>
-                  </td>
+                  <td colSpan={7}><p className="empty-note">Loading…</p></td>
                 </tr>
               )}
             </tbody>
@@ -476,25 +390,10 @@ export default function DashboardPage() {
       {/* ============ ALL-TIME SUMMARY ============ */}
       <div className="quick-stats">
         <QuickStat label="Total bills (all time)" value={allTime.total} />
-        <QuickStat
-          label="Scanned (all time)"
-          value={allTime.scanned}
-          tone="success"
-        />
-        <QuickStat
-          label="Pending (all time)"
-          value={allTime.pending}
-          tone="warning"
-        />
-        <QuickStat
-          label="Search attempts"
-          value={allTime.searches}
-          tone="primary"
-        />
-        <QuickStat
-          label="Overall completion"
-          value={`${allTime.completion.toFixed(1)}%`}
-        />
+        <QuickStat label="Scanned (all time)" value={allTime.scanned} tone="success" />
+        <QuickStat label="Pending (all time)" value={allTime.pending} tone="warning" />
+        <QuickStat label="Search attempts" value={allTime.searches} tone="primary" />
+        <QuickStat label="Overall completion" value={`${allTime.completion.toFixed(1)}%`} />
       </div>
     </>
   );
@@ -504,11 +403,7 @@ export default function DashboardPage() {
    Sub-components
    ===================================================================== */
 function KpiCard({
-  tone,
-  label,
-  value,
-  hint,
-  icon,
+  tone, label, value, hint, icon,
 }: {
   tone: "primary" | "success" | "warning" | "danger";
   label: string;
@@ -522,16 +417,16 @@ function KpiCard({
         <div className="kpi-icon">{icon}</div>
         <div className="kpi-value">{value}</div>
       </div>
-      <div className="kpi-label">{label}</div>
-      <div className="kpi-hint">{hint}</div>
+      <div>
+        <div className="kpi-label">{label}</div>
+        <div className="kpi-hint">{hint}</div>
+      </div>
     </div>
   );
 }
 
 function QuickStat({
-  label,
-  value,
-  tone = "neutral",
+  label, value, tone = "neutral",
 }: {
   label: string;
   value: number | string;
@@ -564,11 +459,11 @@ function HourlySparkline({ data }: { data: number[] }) {
 /* Tiny inline icons */
 const iconProps = {
   viewBox: "0 0 24 24",
-  width: 20,
-  height: 20,
+  width: 22,
+  height: 22,
   fill: "none",
   stroke: "currentColor",
-  strokeWidth: 1.8,
+  strokeWidth: 2,
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
 };
