@@ -860,6 +860,44 @@ table.data-table {
 .scan-empty-sub { font-size: 0.9rem; }
 .scan-empty-last { margin-top: 16px; font-size: 0.8rem; color: var(--ink-muted); }
 
+/* ---------- Simplified scan result fields ---------- */
+.scan-field-group { margin-top: 18px; }
+.scan-field-label {
+  font-size: 0.74rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--ink-muted); margin-bottom: 6px;
+}
+.scan-readonly {
+  width: 100%; padding: 13px 16px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 0.95rem; font-weight: 600; color: var(--ink);
+}
+.scan-readonly.mono { font-family: "IBM Plex Mono", monospace; }
+
+/* Manifest description — box 1 (always visible, green by default) */
+.insp-box {
+  border-radius: 12px; padding: 16px 20px; font-weight: 700; font-size: 1rem;
+  text-align: center; border: 1px solid transparent; min-height: 52px;
+  display: flex; align-items: center; justify-content: center;
+}
+.insp-box-green { background: var(--success-soft); color: #047857; border-color: rgba(16, 185, 129, 0.35); }
+.insp-box-red { background: var(--danger-soft); color: #b91c1c; border-color: rgba(239, 68, 68, 0.35); }
+
+/* Box 2 — country_PHYSICAL / COMMERCIAL, bold + bigger per spec */
+.insp-box2 {
+  margin-top: 10px; border-radius: 12px; padding: 14px 20px;
+  text-align: center; font-size: 1.2rem; font-weight: 800; letter-spacing: 0.02em;
+}
+.insp-box2-red { background: var(--danger-soft); color: #b91c1c; border: 1px solid rgba(239, 68, 68, 0.35); }
+
+.scan-stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+.scan-stat-pill {
+  flex: 1; min-width: 140px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 18px; text-align: center;
+}
+.scan-stat-value { font-family: "IBM Plex Mono", monospace; font-size: 1.55rem; font-weight: 700; color: var(--ink); }
+.scan-stat-value.danger { color: var(--danger); }
+.scan-stat-label { font-size: 0.7rem; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
 /* =====================================================================
    UPLOAD PAGE
    ===================================================================== */

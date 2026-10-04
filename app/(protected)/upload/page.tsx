@@ -20,6 +20,7 @@ interface FileStatus {
   progress: number;
   totalBills?: number;
   manifestNumber?: string;
+  flightNumber?: string;
 }
 
 interface RecentManifest {
@@ -136,6 +137,7 @@ export default function UploadPage() {
                     message: data.message ?? data.error ?? "Done.",
                     totalBills: data.total_bills,
                     manifestNumber: data.manifest,
+                    flightNumber: data.flightNumber,
                     progress: 100,
                   }
                 : r
@@ -372,6 +374,7 @@ export default function UploadPage() {
                     <span className="upload-progress-message">
                       {r.message}
                       {r.manifestNumber && <><span> · </span><span className="mono">{r.manifestNumber}</span></>}
+                      {r.flightNumber && <><span> · </span><span className="mono">Flight {r.flightNumber}</span></>}
                       {r.totalBills !== undefined && <><span> · </span><strong>{r.totalBills}</strong> bills</>}
                     </span>
                     {isActive && <span className="upload-progress-pct">{Math.round(r.progress)}%</span>}

@@ -64,14 +64,20 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Case B: more rows than before -> append, upsert handles de-dupe
+      // Case B: more rows than before -> append, upsert handles de-dupe.
+      // Also refresh flight_number in case it was blank/wrong on first upload.
       manifestId = existingManifest.id;
+      await db
+        .from("manifests")
+        .update({ flight_number: parsed.flightNumber || null })
+        .eq("id", manifestId);
     } else {
       // Brand new manifest
       const { data: newManifest, error: insertManifestErr } = await db
         .from("manifests")
         .insert({
           manifest_number: parsed.manifestNumber,
+          flight_number: parsed.flightNumber || null,
           original_filename: file.name,
           total_bills: 0,
         })
@@ -114,11 +120,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       manifest: parsed.manifestNumber,
+      flightNumber: parsed.flightNumber || null,
       status: existingManifest ? "updated" : "created",
       total_bills: count,
       message: existingManifest
         ? `Updated — now ${count} bills (was ${existingManifest.total_bills}).`
-        : `Created — ${count} bills linked.`,
+        : `Created — ${count} bills linked.${parsed.flightNumber ? ` Flight ${parsed.flightNumber}.` : ""}`,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
