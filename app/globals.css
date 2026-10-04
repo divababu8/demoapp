@@ -872,6 +872,18 @@ table.data-table {
   font-size: 0.95rem; font-weight: 600; color: var(--ink);
 }
 .scan-readonly.mono { font-family: "IBM Plex Mono", monospace; }
+.scan-readonly-ok { background: var(--success-soft); color: #047857; border-color: rgba(16, 185, 129, 0.35); }
+.scan-readonly-warn { background: var(--warning-soft); color: #b45309; border-color: rgba(245, 158, 11, 0.35); }
+
+/* Tracking Number / Status and Flight No / Manifest Code sit side by side
+   on wide screens, stack on narrow ones. */
+.scan-field-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px;
+}
+.scan-field-row .scan-field-group { margin-top: 0; }
+@media (max-width: 640px) {
+  .scan-field-row { grid-template-columns: 1fr; }
+}
 
 /* Manifest description — box 1 (always visible, green by default) */
 .insp-box {

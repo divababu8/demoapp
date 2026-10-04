@@ -213,13 +213,10 @@ export default function ScanningPage() {
     return evaluateCountry(rawCode);
   }, [result]);
 
-  const trackingStatusText = result
-    ? `${result.bill.awb_number} — ${result.bill.scan_status === "scanned" ? "SCANNED" : "NOT SCANNED"}`
-    : "—";
-
-  const flightManifestText = result
-    ? `${result.bill.flight_number ? result.bill.flight_number + " / " : ""}${result.bill.manifest_number}`
-    : "—";
+  const trackingNumberText = result ? result.bill.awb_number : "—";
+  const statusText = result ? (result.bill.scan_status === "scanned" ? "SCANNED" : "NOT SCANNED") : "—";
+  const flightNoText = result ? (result.bill.flight_number || "—") : "—";
+  const manifestCodeText = result ? result.bill.manifest_number : "—";
 
   return (
     <>
@@ -273,10 +270,18 @@ export default function ScanningPage() {
 
       {notFound && <p className="scan-alert">{notFound}</p>}
 
-      {/* ============ Tracking number & status ============ */}
-      <div className="scan-field-group">
-        <div className="scan-field-label">Tracking Number &amp; Status</div>
-        <div className="scan-readonly mono">{trackingStatusText}</div>
+      {/* ============ Tracking number & status — separate fields ============ */}
+      <div className="scan-field-row">
+        <div className="scan-field-group">
+          <div className="scan-field-label">Tracking Number</div>
+          <div className="scan-readonly mono">{trackingNumberText}</div>
+        </div>
+        <div className="scan-field-group">
+          <div className="scan-field-label">Status</div>
+          <div className={`scan-readonly mono${result ? (result.bill.scan_status === "scanned" ? " scan-readonly-ok" : " scan-readonly-warn") : ""}`}>
+            {statusText}
+          </div>
+        </div>
       </div>
 
       {/* ============ Manifest description (country inspection) ============ */}
@@ -294,10 +299,16 @@ export default function ScanningPage() {
         )}
       </div>
 
-      {/* ============ Flight no & manifest code ============ */}
-      <div className="scan-field-group">
-        <div className="scan-field-label">Flight No &amp; Manifest Code</div>
-        <div className="scan-readonly mono">{flightManifestText}</div>
+      {/* ============ Flight no & manifest code — separate fields, below description ============ */}
+      <div className="scan-field-row">
+        <div className="scan-field-group">
+          <div className="scan-field-label">Flight No</div>
+          <div className="scan-readonly mono">{flightNoText}</div>
+        </div>
+        <div className="scan-field-group">
+          <div className="scan-field-label">Manifest Code</div>
+          <div className="scan-readonly mono">{manifestCodeText}</div>
+        </div>
       </div>
 
       {/* ============ Scan count / shortage / overage ============ */}

@@ -16,6 +16,7 @@ Follow these steps **in order**. Each step depends on the previous one working.
    - `Project URL`
    - `anon public` key
    - `service_role` key (keep this secret — never put it in frontend code)
+   - **JWT Settings → JWT Secret** — this one's new: it lets the scan API verify a login token in under a millisecond instead of making an extra network call to Supabase on every single scan. Without it the app still works correctly, just a bit slower.
 
 ---
 
@@ -26,7 +27,7 @@ cd manifest-scan-app
 cp .env.example .env.local
 ```
 
-Open `.env.local` and paste in the 3 values from Step 1.6.
+Open `.env.local` and paste in the 4 values from Step 1.7.
 
 ---
 
@@ -95,10 +96,11 @@ git push -u origin main
 ### Deploy on Vercel (free)
 1. Go to https://vercel.com → Sign up with GitHub.
 2. **Add New Project** → import your repo.
-3. In **Environment Variables**, add the same 3 values from your `.env.local`:
+3. In **Environment Variables**, add the same 4 values from your `.env.local`:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
+   - `SUPABASE_JWT_SECRET` — if you skip this one the app still works, scanning will just carry the extra per-request network delay this update removes
 4. Click **Deploy**. Vercel gives you a public HTTPS URL (e.g. `your-app.vercel.app`) — this is your live internet-accessible dashboard.
 5. Every future `git push` auto-redeploys.
 

@@ -89,7 +89,13 @@ values if you skipped Docker):
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from step 3>
 SUPABASE_SERVICE_ROLE_KEY=<service_role key from step 3>
+SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
 ```
+
+That last one is the Supabase CLI's well-known default local JWT secret —
+every local Supabase CLI project uses this exact value unless you've
+customized it in `supabase/config.toml`. (For your cloud project, get the
+real one from Project Settings → API → JWT Settings → JWT Secret instead.)
 
 ## STEP 7 — Run the app
 
