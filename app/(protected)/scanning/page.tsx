@@ -4,11 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAuthHeader, supabase } from "@/lib/supabaseClient";
 import { COUNTRY_CODE_COLUMN_HEADER, evaluateCountry } from "@/lib/countryInspection";
 
-const AWB_REGEX = /^\d{8,32}$/; // scanners sometimes send long prefixed payloads
+const AWB_REGEX = /^\d{8,32}$/;
+const AUTO_RESET_MS = 4000; // 4 seconds after a result, clear fields
+const AUTO_SUBMIT_DEBOUNCE_MS = 140;
 
-/* =====================================================================
-   TYPES
-   ===================================================================== */
 interface ScanResult {
   found: true;
   justScanned: boolean;
@@ -26,17 +25,10 @@ interface ScanResult {
   };
 }
 
-interface ScanStats {
-  scanned: number;
-  shortage: number;
-  overage: number;
-}
+interface ScanStats { scanned: number; shortage: number; overage: number; }
 
 const OVERAGE_HOURS = 10;
 
-/* =====================================================================
-   PAGE
-   ===================================================================== */
 export default function ScanningPage() {
   const [input, setInput] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
@@ -48,13 +40,33 @@ export default function ScanningPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const requestSeq = useRef(0);
 
-  // Auto-submit debounce: after the scanner finishes "typing", it goes
-  // quiet for ~140 ms. We submit on that quiet moment. Also still fires
-  // on Enter (manual typists, or scanners that send a terminator).
   const autoSubmitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSubmittedRef = useRef<string | null>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  /* ---------- helpers ---------- */
+  function cancelAutoReset() {
+    if (autoResetTimer.current) {
+      clearTimeout(autoResetTimer.current);
+      autoResetTimer.current = null;
+    }
+  }
+
+  function scheduleAutoReset() {
+    cancelAutoReset();
+    autoResetTimer.current = setTimeout(() => {
+      // Only reset if the user hasn't started typing a new scan
+      if (inputRef.current && inputRef.current.value.trim().length === 0) {
+        setResult(null);
+        setNotFound(null);
+        setFlash(null);
+        lastSubmittedRef.current = null;
+        inputRef.current?.focus();
+      }
+    }, AUTO_RESET_MS);
+  }
 
   /* ---------- Live stats (unchanged) ---------- */
   useEffect(() => {
@@ -63,13 +75,11 @@ export default function ScanningPage() {
         supabase.from("manifest_report").select("manifest_id, scanned_count, pending_count"),
         supabase.from("manifest_pending_age").select("manifest_id, oldest_pending_at"),
       ]);
-
       const ageByManifest = new Map<string, string>();
       (ageRes.data ?? []).forEach((r: any) => ageByManifest.set(r.manifest_id, r.oldest_pending_at));
 
       let scanned = 0, shortage = 0, overage = 0;
       const now = Date.now();
-
       (reportRes.data ?? []).forEach((m: any) => {
         scanned += m.scanned_count ?? 0;
         shortage += m.pending_count ?? 0;
@@ -78,10 +88,8 @@ export default function ScanningPage() {
           overage += m.pending_count ?? 0;
         }
       });
-
       setStats({ scanned, shortage, overage });
     }
-
     loadStats();
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -98,6 +106,7 @@ export default function ScanningPage() {
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
+      if (autoResetTimer.current) clearTimeout(autoResetTimer.current);
       supabase.removeChannel(ch);
     };
   }, []);
@@ -106,17 +115,22 @@ export default function ScanningPage() {
   const submit = useCallback(async (raw: string) => {
     const awb = raw.trim();
     if (!awb) return;
-    if (lastSubmittedRef.current === awb && pending) return; // dedupe
-    lastSubmittedRef.current = awb;
 
     if (!AWB_REGEX.test(awb)) {
       setNotFound(`"${awb}" is not a valid tracking number.`);
       setResult(null); setFlash("err"); beep("err");
+      lastSubmittedRef.current = awb;
+      scheduleAutoReset();
       return;
     }
 
     const mySeq = ++requestSeq.current;
-    setInput(""); setPending(true); setNotFound(null);
+    setInput("");
+    // ↓↓↓ KEY FIX: allow the same number to be auto-submitted again later
+    lastSubmittedRef.current = awb;
+    setPending(true);
+    setNotFound(null);
+    cancelAutoReset();
     inputRef.current?.focus();
 
     try {
@@ -131,51 +145,53 @@ export default function ScanningPage() {
 
       if (res.status === 401) {
         setNotFound("Your session expired — please log in again.");
-        setResult(null); setFlash("err"); beep("err"); return;
+        setResult(null); setFlash("err"); beep("err");
+        scheduleAutoReset();
+        return;
       }
 
       const data = await res.json();
 
       if (!data.found) {
         setNotFound(data.message ?? `Tracking number ${awb} not found.`);
-        setResult(null); setFlash("err"); beep("err"); return;
+        setResult(null); setFlash("err"); beep("err");
+        scheduleAutoReset();
+        return;
       }
 
       setResult(data as ScanResult);
       setNotFound(null);
       setFlash(data.justScanned ? "ok" : "warn");
       beep(data.justScanned ? "ok" : "warn");
+      scheduleAutoReset();
     } catch {
       if (mySeq !== requestSeq.current) return;
       setNotFound("Network error — could not reach the server.");
       setResult(null); setFlash("err"); beep("err");
+      scheduleAutoReset();
     } finally {
       if (mySeq === requestSeq.current) setPending(false);
     }
-  }, [pending]);
+  }, []);
 
-  /* ---------- Input handlers ----------
-     Auto-submit logic:
-       - On every keystroke, reset a 140 ms timer.
-       - When the timer fires (input went quiet) AND the value meets the
-         minimum AWB length (8 digits) AND it hasn't been submitted yet,
-         submit automatically.
-       - Enter still forces an immediate submit.
-     This gives barcode-scanner behavior without needing the Submit button,
-     and without truncating mid-scan (we wait for the input to settle). */
+  /* ---------- Input handlers ---------- */
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     setInput(value);
+
+    // User is typing → cancel any scheduled auto-reset so their entry isn't wiped
+    cancelAutoReset();
 
     if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
 
     const trimmed = value.trim();
     if (trimmed.length >= 8 && AWB_REGEX.test(trimmed)) {
       autoSubmitTimer.current = setTimeout(() => {
-        if (lastSubmittedRef.current !== trimmed) {
-          submit(trimmed);
-        }
-      }, 140);
+        // Only block if we ALREADY have this exact value pending
+        // (prevents double-fire while the request is in flight)
+        if (pending && lastSubmittedRef.current === trimmed) return;
+        submit(trimmed);
+      }, AUTO_SUBMIT_DEBOUNCE_MS);
     }
   }
 
@@ -219,15 +235,12 @@ export default function ScanningPage() {
     setInput(""); setResult(null); setNotFound(null); setFlash(null);
     lastSubmittedRef.current = null;
     if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
+    cancelAutoReset();
     requestSeq.current++;
     inputRef.current?.focus();
   }
 
-  /* ---------- Derived ----------
-     IMPORTANT: we always display the *stored* AWB (result.bill.awb_number),
-     NOT the raw scanned string. So if the scanner sent
-     "12121111877951285643" and we suffix-matched "877951285643", the user
-     sees "877951285643" — the true tracking number. */
+  /* ---------- Derived ---------- */
   const inspection = useMemo(() => {
     if (!result) return null;
     const rawCode = result.bill.extra_data?.[COUNTRY_CODE_COLUMN_HEADER];
@@ -247,9 +260,7 @@ export default function ScanningPage() {
   return (
     <div className="scan-page">
       <div className="page-header scan-page-header">
-        <div>
-          <h1 className="page-title">Scan Shipments</h1>
-        </div>
+        <div><h1 className="page-title">Scan Shipments</h1></div>
       </div>
 
       <div className="scan-panel scan-page-panel">
@@ -283,7 +294,6 @@ export default function ScanningPage() {
 
       {notFound && <p className="scan-alert scan-page-alert">{notFound}</p>}
 
-      {/* Tracking Number shows the STORED awb, not the raw scan */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Tracking Number</div>
