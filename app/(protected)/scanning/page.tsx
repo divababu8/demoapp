@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAuthHeader, supabase } from "@/lib/supabaseClient";
 import { COUNTRY_CODE_COLUMN_HEADER, evaluateCountry } from "@/lib/countryInspection";
 
-const AWB_REGEX = /^\d{4,20}$/;
+const AWB_REGEX = /^\d{8,32}$/; // scanners sometimes send long prefixed payloads
 
 /* =====================================================================
    TYPES
@@ -48,9 +48,15 @@ export default function ScanningPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const requestSeq = useRef(0);
 
+  // Auto-submit debounce: after the scanner finishes "typing", it goes
+  // quiet for ~140 ms. We submit on that quiet moment. Also still fires
+  // on Enter (manual typists, or scanners that send a terminator).
+  const autoSubmitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSubmittedRef = useRef<string | null>(null);
+
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  /* ---------- Scan count / shortage / overage — live totals ---------- */
+  /* ---------- Live stats (unchanged) ---------- */
   useEffect(() => {
     async function loadStats() {
       const [reportRes, ageRes] = await Promise.all([
@@ -61,9 +67,7 @@ export default function ScanningPage() {
       const ageByManifest = new Map<string, string>();
       (ageRes.data ?? []).forEach((r: any) => ageByManifest.set(r.manifest_id, r.oldest_pending_at));
 
-      let scanned = 0;
-      let shortage = 0;
-      let overage = 0;
+      let scanned = 0, shortage = 0, overage = 0;
       const now = Date.now();
 
       (reportRes.data ?? []).forEach((m: any) => {
@@ -93,62 +97,20 @@ export default function ScanningPage() {
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
       supabase.removeChannel(ch);
     };
   }, []);
-
-  /* ---------- Re-fetch full bill if the RPC returned a partial one ----------
-     The scan_bill() RPC returns a minimal bill on repeat lookups (this is
-     what caused blank Tracking Number / Manifest Code on "Already scanned").
-     This fetches the full bill directly from the `bills` table joined with
-     `manifests`, and merges it in, so all fields always populate identically
-     whether it's a first-time scan or a repeat.                              */
-  async function hydrateBill(partial: ScanResult): Promise<ScanResult> {
-    const needsFetch =
-      !partial.bill?.awb_number ||
-      !partial.bill?.manifest_number ||
-      !partial.bill?.flight_number ||
-      !partial.bill?.extra_data ||
-      Object.keys(partial.bill.extra_data ?? {}).length === 0;
-
-    if (!needsFetch) return partial;
-
-    // We need to find the bill by AWB. `matchedAwb` is the true stored AWB
-    // (the RPC tells us which one it matched); fall back to what we typed.
-    const awbToLookup = partial.matchedAwb || partial.bill?.awb_number;
-    if (!awbToLookup) return partial;
-
-    const { data } = await supabase
-      .from("bills")
-      .select("id, awb_number, scan_status, extra_data, manifest_id, manifests(manifest_number, flight_number, upload_date)")
-      .eq("awb_number", awbToLookup)
-      .maybeSingle();
-
-    if (!data) return partial;
-
-    const m: any = (data as any).manifests ?? {};
-
-    return {
-      ...partial,
-      bill: {
-        id: data.id,
-        awb_number: data.awb_number,
-        scan_status: data.scan_status,
-        extra_data: data.extra_data ?? {},
-        manifest_number: m.manifest_number ?? partial.bill.manifest_number ?? "—",
-        flight_number: m.flight_number ?? null,
-        manifest_upload_date: m.upload_date ?? partial.bill.manifest_upload_date ?? "—",
-      },
-    };
-  }
 
   /* ---------- Submit ---------- */
   const submit = useCallback(async (raw: string) => {
     const awb = raw.trim();
     if (!awb) return;
+    if (lastSubmittedRef.current === awb && pending) return; // dedupe
+    lastSubmittedRef.current = awb;
 
     if (!AWB_REGEX.test(awb)) {
-      setNotFound(`"${awb}" is not a valid number — enter the full tracking number only.`);
+      setNotFound(`"${awb}" is not a valid tracking number.`);
       setResult(null); setFlash("err"); beep("err");
       return;
     }
@@ -179,32 +141,50 @@ export default function ScanningPage() {
         setResult(null); setFlash("err"); beep("err"); return;
       }
 
-      // Hydrate — ensures full bill detail is present even on repeat scans
-      const full = await hydrateBill(data as ScanResult);
-      if (mySeq !== requestSeq.current) return;
-
-      setResult(full);
+      setResult(data as ScanResult);
       setNotFound(null);
-      setFlash(full.justScanned ? "ok" : "warn");
-      beep(full.justScanned ? "ok" : "warn");
+      setFlash(data.justScanned ? "ok" : "warn");
+      beep(data.justScanned ? "ok" : "warn");
     } catch {
       if (mySeq !== requestSeq.current) return;
-      setNotFound("Network error — could not reach the server. Check your connection and try again.");
+      setNotFound("Network error — could not reach the server.");
       setResult(null); setFlash("err"); beep("err");
     } finally {
       if (mySeq === requestSeq.current) setPending(false);
     }
-  }, []);
+  }, [pending]);
+
+  /* ---------- Input handlers ----------
+     Auto-submit logic:
+       - On every keystroke, reset a 140 ms timer.
+       - When the timer fires (input went quiet) AND the value meets the
+         minimum AWB length (8 digits) AND it hasn't been submitted yet,
+         submit automatically.
+       - Enter still forces an immediate submit.
+     This gives barcode-scanner behavior without needing the Submit button,
+     and without truncating mid-scan (we wait for the input to settle). */
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    setInput(value);
+
+    if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
+
+    const trimmed = value.trim();
+    if (trimmed.length >= 8 && AWB_REGEX.test(trimmed)) {
+      autoSubmitTimer.current = setTimeout(() => {
+        if (lastSubmittedRef.current !== trimmed) {
+          submit(trimmed);
+        }
+      }, 140);
+    }
+  }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
+      if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
       submit(input);
     }
-  }
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setInput(e.target.value);
   }
 
   function beep(kind: "ok" | "warn" | "err") {
@@ -237,11 +217,17 @@ export default function ScanningPage() {
 
   function clearAll() {
     setInput(""); setResult(null); setNotFound(null); setFlash(null);
+    lastSubmittedRef.current = null;
+    if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
     requestSeq.current++;
     inputRef.current?.focus();
   }
 
-  /* ---------- Derived ---------- */
+  /* ---------- Derived ----------
+     IMPORTANT: we always display the *stored* AWB (result.bill.awb_number),
+     NOT the raw scanned string. So if the scanner sent
+     "12121111877951285643" and we suffix-matched "877951285643", the user
+     sees "877951285643" — the true tracking number. */
   const inspection = useMemo(() => {
     if (!result) return null;
     const rawCode = result.bill.extra_data?.[COUNTRY_CODE_COLUMN_HEADER];
@@ -274,7 +260,7 @@ export default function ScanningPage() {
               value={input}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              placeholder="Scan barcode or type tracking number, then Enter"
+              placeholder="Scan barcode or type tracking number"
               autoFocus inputMode="numeric" autoComplete="off" spellCheck={false}
               className={`scan-input${flash ? ` scan-input-${flash}` : ""}`}
             />
@@ -287,26 +273,17 @@ export default function ScanningPage() {
 
           <button
             type="button"
-            className="btn btn-primary scan-search-btn"
-            onClick={() => submit(input)}
-            disabled={pending || input.trim().length === 0}
-          >
-            Submit
-          </button>
-
-          <button
-            type="button"
             className="btn btn-outline scan-clear-btn"
             onClick={clearAll}
-            disabled={pending && input.trim().length === 0}
           >
-            Clear
+            Reset
           </button>
         </div>
       </div>
 
       {notFound && <p className="scan-alert scan-page-alert">{notFound}</p>}
 
+      {/* Tracking Number shows the STORED awb, not the raw scan */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Tracking Number</div>
