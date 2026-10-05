@@ -4,8 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAuthHeader, supabase } from "@/lib/supabaseClient";
 import { COUNTRY_CODE_COLUMN_HEADER, evaluateCountry } from "@/lib/countryInspection";
 
-const AWB_REGEX = /^\d{8,15}$/;
-const AWB_AUTOSUBMIT_MIN = 8;
+const AWB_REGEX = /^\d{4,20}$/;
 
 /* =====================================================================
    TYPES
@@ -48,7 +47,6 @@ export default function ScanningPage() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const requestSeq = useRef(0);
-  const autoSubmittedRef = useRef<string | null>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
@@ -99,7 +97,17 @@ export default function ScanningPage() {
     };
   }, []);
 
-  /* ---------- Submit (scan or manual Enter) ---------- */
+  /* ---------- Submit (scan or manual Enter/Submit click) ----------
+     IMPORTANT: this only ever fires on Enter or the Submit button — NOT
+     on every keystroke. An earlier version auto-submitted as soon as 8
+     digits were typed, which truncated real scans: your scanners send
+     longer payloads with the real tracking number embedded in them (the
+     "9876612345678 contains 12345678" case), and submitting the instant
+     8 digits were reached sent a partial, wrong value before the scanner
+     had finished typing the rest. That's what caused "not valid" /
+     missing-tracking-number errors. Waiting for the scanner's own Enter
+     terminator (or an explicit Submit click) sends the complete payload
+     every time, and the backend's suffix-matching handles the rest. */
   const submit = useCallback(async (raw: string) => {
     const awb = raw.trim();
     if (!awb) return;
@@ -136,6 +144,12 @@ export default function ScanningPage() {
         setResult(null); setFlash("err"); beep("err"); return;
       }
 
+      // Found is found — whether this is the FIRST scan (justScanned=true)
+      // or a REPEAT of an already-scanned bill (justScanned=false), every
+      // field below (tracking number, status, manifest description,
+      // flight/manifest code) always populates from the same `result`,
+      // exactly the same as a fresh scan. Only the badge color/text and
+      // the search count differ.
       setResult(data as ScanResult);
       setNotFound(null);
       setFlash(data.justScanned ? "ok" : "warn");
@@ -149,26 +163,17 @@ export default function ScanningPage() {
     }
   }, []);
 
-  // Barcode scanners type fast and send Enter; manual typists get a Submit
-  // button. Auto-submit also fires once a full-length numeric value is
-  // typed/scanned, so a scanner that doesn't send Enter still works.
+  // Barcode scanners type fast then send Enter — that's the only trigger.
+  // Manual typists use the Submit button. No per-keystroke auto-submit.
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
-      autoSubmittedRef.current = null;
       submit(input);
     }
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value;
-    setInput(val);
-    const trimmed = val.trim();
-    if (!pending && AWB_REGEX.test(trimmed) && trimmed.length >= AWB_AUTOSUBMIT_MIN && autoSubmittedRef.current !== trimmed) {
-      autoSubmittedRef.current = trimmed;
-      submit(trimmed);
-    }
-    if (trimmed.length < AWB_AUTOSUBMIT_MIN) autoSubmittedRef.current = null;
+    setInput(e.target.value);
   }
 
   function beep(kind: "ok" | "warn" | "err") {
@@ -201,7 +206,6 @@ export default function ScanningPage() {
 
   function clearAll() {
     setInput(""); setResult(null); setNotFound(null); setFlash(null);
-    autoSubmittedRef.current = null;
     requestSeq.current++;
     inputRef.current?.focus();
   }
@@ -214,21 +218,26 @@ export default function ScanningPage() {
   }, [result]);
 
   const trackingNumberText = result ? result.bill.awb_number : "—";
-  const statusText = result ? (result.bill.scan_status === "scanned" ? "SCANNED" : "NOT SCANNED") : "—";
   const flightNoText = result ? (result.bill.flight_number || "—") : "—";
   const manifestCodeText = result ? result.bill.manifest_number : "—";
 
+  const statusLabel = !result
+    ? "—"
+    : result.justScanned
+      ? "SCANNED NOW"
+      : `ALREADY SCANNED (searched ${result.searchCount}×)`;
+
   return (
-    <>
+    <div className="scan-page">
       {/* ============ HEADER ============ */}
-      <div className="page-header">
+      <div className="page-header scan-page-header">
         <div>
           <h1 className="page-title">Scan Shipments</h1>
         </div>
       </div>
 
       {/* ============ SCAN INPUT ============ */}
-      <div className="scan-panel">
+      <div className="scan-panel scan-page-panel">
         <div className="scan-panel-row">
           <div className="scan-panel-input-wrap">
             <input
@@ -247,11 +256,10 @@ export default function ScanningPage() {
             )}
           </div>
 
-          {/* Explicit Submit button for manual entry — a real scanner auto-submits via Enter. */}
           <button
             type="button"
             className="btn btn-primary scan-search-btn"
-            onClick={() => { autoSubmittedRef.current = null; submit(input); }}
+            onClick={() => submit(input)}
             disabled={pending || input.trim().length === 0}
           >
             Submit
@@ -268,51 +276,56 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {notFound && <p className="scan-alert">{notFound}</p>}
+      {notFound && <p className="scan-alert scan-page-alert">{notFound}</p>}
 
       {/* ============ Tracking number & status — separate fields ============ */}
-      <div className="scan-field-row">
+      <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Tracking Number</div>
           <div className="scan-readonly mono">{trackingNumberText}</div>
         </div>
         <div className="scan-field-group">
           <div className="scan-field-label">Status</div>
-          <div className={`scan-readonly mono${result ? (result.bill.scan_status === "scanned" ? " scan-readonly-ok" : " scan-readonly-warn") : ""}`}>
-            {statusText}
+          <div className={`scan-readonly mono${result ? (result.justScanned ? " scan-readonly-ok" : " scan-readonly-warn") : ""}`}>
+            {statusLabel}
           </div>
         </div>
       </div>
 
       {/* ============ Manifest description (country inspection) ============ */}
-      <div className="scan-field-group">
+      <div className="scan-field-group scan-page-row">
         <div className="scan-field-label">Manifest Description</div>
-        <div className={`insp-box ${inspection ? (inspection.level === "red" ? "insp-box-red" : "insp-box-green") : "insp-box-green"}`}>
-          {inspection
-            ? inspection.level === "red"
-              ? inspection.box1Message
-              : `${inspection.countryCode || "—"} — CLEARED`
-            : "—"}
-        </div>
+        <textarea
+          readOnly
+          rows={2}
+          value={
+            inspection
+              ? inspection.level === "red"
+                ? inspection.box1Message
+                : `${inspection.countryCode || "—"} — CLEARED`
+              : "—"
+          }
+          className={`insp-textarea ${inspection ? (inspection.level === "red" ? "insp-box-red" : "insp-box-green") : "insp-box-green"}`}
+        />
         {inspection && inspection.level === "red" && inspection.box2Message && (
           <div className="insp-box2 insp-box2-red">{inspection.box2Message}</div>
         )}
       </div>
 
-      {/* ============ Flight no & manifest code — separate fields, below description ============ */}
-      <div className="scan-field-row">
+      {/* ============ Flight no & manifest code — separate fields ============ */}
+      <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Flight No</div>
           <div className="scan-readonly mono">{flightNoText}</div>
         </div>
         <div className="scan-field-group">
           <div className="scan-field-label">Manifest Code</div>
-          <div className="scan-readonly mono">{manifestCodeText}</div>
+          <div className="scan-readonly mono scan-readonly-big">{manifestCodeText}</div>
         </div>
       </div>
 
       {/* ============ Scan count / shortage / overage ============ */}
-      <div className="scan-stats-row">
+      <div className="scan-stats-row scan-page-row">
         <div className="scan-stat-pill">
           <div className="scan-stat-value">{stats.scanned}</div>
           <div className="scan-stat-label">Scan Count</div>
@@ -326,6 +339,6 @@ export default function ScanningPage() {
           <div className="scan-stat-label">Overage</div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

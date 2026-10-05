@@ -874,6 +874,8 @@ table.data-table {
 .scan-readonly.mono { font-family: "IBM Plex Mono", monospace; }
 .scan-readonly-ok { background: var(--success-soft); color: #047857; border-color: rgba(16, 185, 129, 0.35); }
 .scan-readonly-warn { background: var(--warning-soft); color: #b45309; border-color: rgba(245, 158, 11, 0.35); }
+/* Manifest Code — bigger/bold per spec (Flight No stays regular size). */
+.scan-readonly-big { font-size: 1.15rem; font-weight: 800; }
 
 /* Tracking Number / Status and Flight No / Manifest Code sit side by side
    on wide screens, stack on narrow ones. */
@@ -885,11 +887,13 @@ table.data-table {
   .scan-field-row { grid-template-columns: 1fr; }
 }
 
-/* Manifest description — box 1 (always visible, green by default) */
-.insp-box {
-  border-radius: 12px; padding: 16px 20px; font-weight: 700; font-size: 1rem;
-  text-align: center; border: 1px solid transparent; min-height: 52px;
-  display: flex; align-items: center; justify-content: center;
+/* Manifest description — fixed read-only textarea, bigger/bold per spec.
+   resize:none + no scrollbar = "fixed", matching the no-scrolling page rule. */
+.insp-textarea {
+  width: 100%; border-radius: 12px; padding: 16px 20px;
+  font-weight: 800; font-size: 1.2rem; font-family: inherit; line-height: 1.3;
+  text-align: center; border: 1px solid transparent;
+  resize: none; overflow: hidden; cursor: default;
 }
 .insp-box-green { background: var(--success-soft); color: #047857; border-color: rgba(16, 185, 129, 0.35); }
 .insp-box-red { background: var(--danger-soft); color: #b91c1c; border-color: rgba(239, 68, 68, 0.35); }
@@ -897,7 +901,7 @@ table.data-table {
 /* Box 2 — country_PHYSICAL / COMMERCIAL, bold + bigger per spec */
 .insp-box2 {
   margin-top: 10px; border-radius: 12px; padding: 14px 20px;
-  text-align: center; font-size: 1.2rem; font-weight: 800; letter-spacing: 0.02em;
+  text-align: center; font-size: 1.25rem; font-weight: 800; letter-spacing: 0.02em;
 }
 .insp-box2-red { background: var(--danger-soft); color: #b91c1c; border: 1px solid rgba(239, 68, 68, 0.35); }
 
@@ -909,6 +913,22 @@ table.data-table {
 .scan-stat-value { font-family: "IBM Plex Mono", monospace; font-size: 1.55rem; font-weight: 700; color: var(--ink); }
 .scan-stat-value.danger { color: var(--danger); }
 .scan-stat-label { font-size: 0.7rem; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
+/* ---------- Scan page: compact, no-scroll layout ----------
+   Tightens vertical spacing specifically on this page (the shared .main
+   frame and other pages are untouched) so the whole thing — input, both
+   field rows, description, flight/manifest, and the stats row — fits a
+   normal laptop/desktop viewport without a scrollbar. The :has() override
+   trims the shared page frame's own padding too; on the rare browser
+   without :has() support the page is just very slightly less tight, not
+   broken. */
+.main:has(.scan-page) { padding-top: 16px; padding-bottom: 20px; }
+.scan-page-header { margin-bottom: 10px; }
+.scan-page-header .page-title { font-size: 1.3rem; }
+.scan-page-panel { margin-bottom: 0; padding: 14px 16px; }
+.scan-page-alert { margin: 10px 0 0; }
+.scan-page-row { margin-top: 12px; }
+.scan-field-row.scan-page-row { margin-top: 12px; }
 
 /* =====================================================================
    UPLOAD PAGE

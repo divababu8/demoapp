@@ -74,13 +74,18 @@ export function parseManifestExcel(
   }
 
   const headers = raw[0].map((h) => (h === null ? "" : String(h).trim()));
-  const awbColIndex = headers.indexOf(AWB_COLUMN_HEADER);
+
+  // Normalized match first (trims, collapses internal whitespace, ignores
+  // case) — catches real-world header variations like "Tracking Number "
+  // or a non-breaking space between words that a plain string match
+  // would miss. If nothing matches by name at all, falls back to the
+  // FIRST column, since that's confirmed to be where it lives in your
+  // files — this means upload never hard-fails on a header-text mismatch.
+  const normalize = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  let awbColIndex = headers.findIndex((h) => normalize(h) === normalize(AWB_COLUMN_HEADER));
 
   if (awbColIndex === -1) {
-    throw new Error(
-      `Column "${AWB_COLUMN_HEADER}" not found in "${filename}". ` +
-      `Found headers: ${headers.join(", ")}`
-    );
+    awbColIndex = 0; // confirmed: Tracking Number is always the first column
   }
 
   const dataRows = raw.slice(1).filter((row) => row.some((cell) => cell !== null));
@@ -89,7 +94,9 @@ export function parseManifestExcel(
   // first data row (it's a manifest-level attribute, so every row in the
   // file should carry the same value) — fall back to the filename if that
   // column doesn't exist or its first value is blank.
-  const manifestRefColIndex = headers.indexOf(MANIFEST_FLIGHT_COLUMN_HEADER);
+  const manifestRefColIndex = headers.findIndex(
+    (h) => normalize(h) === normalize(MANIFEST_FLIGHT_COLUMN_HEADER)
+  );
   const columnValue =
     manifestRefColIndex !== -1 && dataRows.length > 0
       ? dataRows[0][manifestRefColIndex]
