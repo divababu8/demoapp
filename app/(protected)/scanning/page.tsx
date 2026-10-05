@@ -97,17 +97,52 @@ export default function ScanningPage() {
     };
   }, []);
 
-  /* ---------- Submit (scan or manual Enter/Submit click) ----------
-     IMPORTANT: this only ever fires on Enter or the Submit button — NOT
-     on every keystroke. An earlier version auto-submitted as soon as 8
-     digits were typed, which truncated real scans: your scanners send
-     longer payloads with the real tracking number embedded in them (the
-     "9876612345678 contains 12345678" case), and submitting the instant
-     8 digits were reached sent a partial, wrong value before the scanner
-     had finished typing the rest. That's what caused "not valid" /
-     missing-tracking-number errors. Waiting for the scanner's own Enter
-     terminator (or an explicit Submit click) sends the complete payload
-     every time, and the backend's suffix-matching handles the rest. */
+  /* ---------- Re-fetch full bill if the RPC returned a partial one ----------
+     The scan_bill() RPC returns a minimal bill on repeat lookups (this is
+     what caused blank Tracking Number / Manifest Code on "Already scanned").
+     This fetches the full bill directly from the `bills` table joined with
+     `manifests`, and merges it in, so all fields always populate identically
+     whether it's a first-time scan or a repeat.                              */
+  async function hydrateBill(partial: ScanResult): Promise<ScanResult> {
+    const needsFetch =
+      !partial.bill?.awb_number ||
+      !partial.bill?.manifest_number ||
+      !partial.bill?.flight_number ||
+      !partial.bill?.extra_data ||
+      Object.keys(partial.bill.extra_data ?? {}).length === 0;
+
+    if (!needsFetch) return partial;
+
+    // We need to find the bill by AWB. `matchedAwb` is the true stored AWB
+    // (the RPC tells us which one it matched); fall back to what we typed.
+    const awbToLookup = partial.matchedAwb || partial.bill?.awb_number;
+    if (!awbToLookup) return partial;
+
+    const { data } = await supabase
+      .from("bills")
+      .select("id, awb_number, scan_status, extra_data, manifest_id, manifests(manifest_number, flight_number, upload_date)")
+      .eq("awb_number", awbToLookup)
+      .maybeSingle();
+
+    if (!data) return partial;
+
+    const m: any = (data as any).manifests ?? {};
+
+    return {
+      ...partial,
+      bill: {
+        id: data.id,
+        awb_number: data.awb_number,
+        scan_status: data.scan_status,
+        extra_data: data.extra_data ?? {},
+        manifest_number: m.manifest_number ?? partial.bill.manifest_number ?? "—",
+        flight_number: m.flight_number ?? null,
+        manifest_upload_date: m.upload_date ?? partial.bill.manifest_upload_date ?? "—",
+      },
+    };
+  }
+
+  /* ---------- Submit ---------- */
   const submit = useCallback(async (raw: string) => {
     const awb = raw.trim();
     if (!awb) return;
@@ -144,16 +179,14 @@ export default function ScanningPage() {
         setResult(null); setFlash("err"); beep("err"); return;
       }
 
-      // Found is found — whether this is the FIRST scan (justScanned=true)
-      // or a REPEAT of an already-scanned bill (justScanned=false), every
-      // field below (tracking number, status, manifest description,
-      // flight/manifest code) always populates from the same `result`,
-      // exactly the same as a fresh scan. Only the badge color/text and
-      // the search count differ.
-      setResult(data as ScanResult);
+      // Hydrate — ensures full bill detail is present even on repeat scans
+      const full = await hydrateBill(data as ScanResult);
+      if (mySeq !== requestSeq.current) return;
+
+      setResult(full);
       setNotFound(null);
-      setFlash(data.justScanned ? "ok" : "warn");
-      beep(data.justScanned ? "ok" : "warn");
+      setFlash(full.justScanned ? "ok" : "warn");
+      beep(full.justScanned ? "ok" : "warn");
     } catch {
       if (mySeq !== requestSeq.current) return;
       setNotFound("Network error — could not reach the server. Check your connection and try again.");
@@ -163,8 +196,6 @@ export default function ScanningPage() {
     }
   }, []);
 
-  // Barcode scanners type fast then send Enter — that's the only trigger.
-  // Manual typists use the Submit button. No per-keystroke auto-submit.
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -210,7 +241,7 @@ export default function ScanningPage() {
     inputRef.current?.focus();
   }
 
-  /* ---------- Derived: country inspection status ---------- */
+  /* ---------- Derived ---------- */
   const inspection = useMemo(() => {
     if (!result) return null;
     const rawCode = result.bill.extra_data?.[COUNTRY_CODE_COLUMN_HEADER];
@@ -229,14 +260,12 @@ export default function ScanningPage() {
 
   return (
     <div className="scan-page">
-      {/* ============ HEADER ============ */}
       <div className="page-header scan-page-header">
         <div>
           <h1 className="page-title">Scan Shipments</h1>
         </div>
       </div>
 
-      {/* ============ SCAN INPUT ============ */}
       <div className="scan-panel scan-page-panel">
         <div className="scan-panel-row">
           <div className="scan-panel-input-wrap">
@@ -278,7 +307,6 @@ export default function ScanningPage() {
 
       {notFound && <p className="scan-alert scan-page-alert">{notFound}</p>}
 
-      {/* ============ Tracking number & status — separate fields ============ */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Tracking Number</div>
@@ -292,7 +320,6 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {/* ============ Manifest description (country inspection) ============ */}
       <div className="scan-field-group scan-page-row">
         <div className="scan-field-label">Manifest Description</div>
         <textarea
@@ -312,7 +339,6 @@ export default function ScanningPage() {
         )}
       </div>
 
-      {/* ============ Flight no & manifest code — separate fields ============ */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Flight No</div>
@@ -324,7 +350,6 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {/* ============ Scan count / shortage / overage ============ */}
       <div className="scan-stats-row scan-page-row">
         <div className="scan-stat-pill">
           <div className="scan-stat-value">{stats.scanned}</div>
