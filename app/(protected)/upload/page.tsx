@@ -295,25 +295,80 @@ export default function UploadPage() {
       </div>
 
       {/* ============ DROPZONE ============ */}
-      <div {...getRootProps()} className={`dropzone${isDragActive ? " active" : ""}`}>
-        <input {...getInputProps()} />
-        <div className="dropzone-icon">
-          <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 17V5" /><path d="m7 10 5-5 5 5" /><path d="M4 19h16" />
-          </svg>
-        </div>
-        <p className="dropzone-title">
-          {isDragActive ? "Drop the files here…" : "Drag & drop your manifest Excel files here"}
-        </p>
-        <p className="dropzone-sub">
-          Supports <strong>.xlsx</strong> — drop multiple files at once, no submit button needed.
-        </p>
-        <div style={{ marginTop: 20 }}>
-          <button type="button" className="btn btn-primary" onClick={open}>
-            Browse files
-          </button>
-        </div>
-      </div>
+      {/* ============ DROPZONE (compact) ============ */}
+<div
+  {...getRootProps()}
+  className={`dropzone${isDragActive ? " active" : ""}`}
+  style={{
+    padding: "24px 24px",
+    textAlign: "center",
+    borderRadius: "12px",
+  }}
+>
+  <input {...getInputProps()} />
+
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 16,
+      flexWrap: "wrap",
+    }}
+  >
+    <div
+      className="dropzone-icon"
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        marginBottom: 0,
+        flexShrink: 0,
+      }}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 17V5" />
+        <path d="m7 10 5-5 5 5" />
+        <path d="M4 19h16" />
+      </svg>
+    </div>
+
+    <div style={{ textAlign: "left", minWidth: 0 }}>
+      <p
+        className="dropzone-title"
+        style={{ fontSize: "0.95rem", fontWeight: 700, marginBottom: 2 }}
+      >
+        {isDragActive
+          ? "Drop the files here…"
+          : "Drag & drop your manifest Excel files here"}
+      </p>
+      <p
+        className="dropzone-sub"
+        style={{ fontSize: "0.78rem", margin: 0 }}
+      >
+        Supports <strong>.xlsx</strong> — multiple files at once
+      </p>
+    </div>
+
+    <button
+      type="button"
+      className="btn btn-primary"
+      onClick={open}
+      style={{ height: 34, padding: "0 16px", fontSize: "0.82rem" }}
+    >
+      Browse files
+    </button>
+  </div>
+</div>
 
       {/* ============ BATCH SUMMARY ============ */}
       {results.length > 0 && (

@@ -1,135 +1,218 @@
 import * as XLSX from "xlsx";
 
-// ---------------------------------------------------------------------
-// CONFIG — adjust these to match your exact Excel header text.
-// Must match the header cell in row 1 exactly (case-sensitive).
-// ---------------------------------------------------------------------
-export const AWB_COLUMN_HEADER = "Tracking Number";
+/* =====================================================================
+   COLUMN HEADER CONSTANTS
+   Tuned to the actual manifest Excel headers in this project.
+   ===================================================================== */
 
-// Column that holds the combined "FLIGHTCARRIER FLIGHTNO MANIFESTCARRIER
-// DATE SEQ [...extra]" string, e.g. "QR 1019 FDX 20261003 00004 SAMPLE".
-// I could not tell from what you've shared whether this lives in its own
-// Excel column or is really the filename pattern you already had — this
-// constant covers the "real column" case; if no column with this exact
-// header exists in the file, the parser automatically falls back to
-// parsing the FILENAME with the identical logic instead, so it works
-// either way until you confirm. Set this to your real header if it is a
-// column; leave it as-is (it just won't be found) if you want it to
-// always come from the filename.
+/** Tracking/AWB column — first column in your file, header is
+ *  literally "Tracking Number". We still list aliases in case a future
+ *  template changes it, and because normalization makes matching robust
+ *  to whitespace/tab/case differences. */
+const AWB_HEADER_CANDIDATES = [
+  "tracking number",   // ← YOUR exact header (primary match)
+  "tracking no", "tracking no.", "tracking#", "tracking #",
+  "awb number", "awb no", "awb no.", "awb#", "awb", "awbnumber",
+  "air waybill", "waybill", "waybill number",
+  "master tracking nbr", "master tracking number",
+];
+
+/** Country code column — used by country-inspection rules. */
+export const COUNTRY_CODE_COLUMN_HEADER = "Shpr Ctry";
+
+/** Manifest ref / flight column — optional. Falls back to filename. */
 export const MANIFEST_FLIGHT_COLUMN_HEADER = "Manifest Ref";
 
-export interface ParsedRow {
-  awb_number: string;
-  extra_data: Record<string, string | number | null>;
+/* =====================================================================
+   NORMALIZATION
+   ===================================================================== */
+
+/** Strip whitespace (incl. tabs & non-breaking spaces), lowercase,
+ *  remove BOM/zero-width chars. This is what makes the parser immune
+ *  to " Tracking Number " vs "tracking number" vs "Tracking  Number". */
+function normalizeHeader(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  return String(v)
+    .replace(/\u00a0/g, " ")            // non-breaking space -> space
+    .replace(/[\u200b-\u200d\uFEFF]/g, "") // zero-width + BOM
+    .replace(/[\t\r\n]+/g, " ")          // tabs / newlines -> space
+    .replace(/\s+/g, " ")                // collapse runs of whitespace
+    .trim()
+    .toLowerCase();
 }
 
-export interface ParsedFile {
+function cleanValue(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  return String(v).replace(/\u00a0/g, " ").trim();
+}
+
+/** Tracking numbers: strip ALL whitespace, uppercase. */
+function cleanAwb(v: unknown): string {
+  return cleanValue(v).replace(/\s+/g, "").toUpperCase();
+}
+
+/* =====================================================================
+   HEADER ROW DETECTION
+   Scans the first 10 rows; the row with the most recognizable header
+   words wins. This survives a title/branding row above the real header.
+   ===================================================================== */
+function findHeaderRow(aoa: any[][]): { rowIndex: number; headers: string[] } {
+  const scanUpTo = Math.min(aoa.length, 10);
+  let bestRow = 0;
+  let bestScore = -1;
+
+  for (let r = 0; r < scanUpTo; r++) {
+    const row = aoa[r] ?? [];
+    const normalized = row.map(normalizeHeader);
+    const score = normalized.filter((h) =>
+      h.length > 0 &&
+      (AWB_HEADER_CANDIDATES.some((c) => h.includes(c)) ||
+       h.includes(normalizeHeader(COUNTRY_CODE_COLUMN_HEADER)) ||
+       h.includes(normalizeHeader(MANIFEST_FLIGHT_COLUMN_HEADER)) ||
+       /^(shpr|recip|service|commit|flight|manifest|hs|commodity|country|pieces|weight|tracking)/.test(h))
+    ).length;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestRow = r;
+    }
+  }
+
+  return {
+    rowIndex: bestRow,
+    headers: (aoa[bestRow] ?? []).map(cleanValue),
+  };
+}
+
+/* =====================================================================
+   FIND COLUMN INDEX BY HEADER (exact → substring)
+   ===================================================================== */
+function findColumnIndex(headers: string[], candidates: string[]): number {
+  const normalized = headers.map(normalizeHeader);
+  // Exact match first
+  for (let i = 0; i < normalized.length; i++) {
+    if (candidates.includes(normalized[i])) return i;
+  }
+  // Then substring match
+  for (let i = 0; i < normalized.length; i++) {
+    if (candidates.some((c) => normalized[i].includes(c))) return i;
+  }
+  return -1;
+}
+
+/* =====================================================================
+   FLIGHT + MANIFEST NUMBER PARSER
+   "QR 1019 FDX 20261003 00004 SAMPLE" ->
+     flight   = "QR 1019"
+     manifest = "FDX 20261003 00004"
+   ===================================================================== */
+export function parseFlightAndManifest(source: string): {
+  flightNumber: string | null;
   manifestNumber: string;
-  flightNumber: string;
+} {
+  const cleaned = cleanValue(source)
+    .replace(/\.xlsx?$/i, "")
+    .trim();
+  const parts = cleaned.split(/\s+/);
+
+  const flightNumber = parts.length >= 2 ? `${parts[0]} ${parts[1]}` : (parts[0] ?? null);
+  const manifestNumber = parts.slice(2, 5).join(" ") || cleaned;
+
+  return {
+    flightNumber: flightNumber || null,
+    manifestNumber: manifestNumber || cleaned || "UNKNOWN",
+  };
+}
+
+/* =====================================================================
+   PUBLIC API
+   ===================================================================== */
+export interface ParsedRow {
+  awb_number: string;
+  extra_data: Record<string, any>;
+}
+
+export interface ParseResult {
+  manifestNumber: string;
+  flightNumber: string | null;
   rows: ParsedRow[];
 }
 
-// Splits "QR 1019 FDX 20261003 00004 SAMPLE[.xlsx]" into:
-//   flightNumber   = "QR 1019"              (first 2 tokens)
-//   manifestNumber = "FDX 20261003 00004"    (next 3 tokens)
-// Anything after that (e.g. "SAMPLE") is ignored.
-// Falls back to using the whole string as the manifest number (no flight
-// number) if it doesn't have at least 5 space-separated tokens, so an
-// unexpected format never crashes the upload — it just can't split it.
-export function parseFlightAndManifest(raw: string): { flightNumber: string; manifestNumber: string } {
-  const base = raw.replace(/\.(xlsx|xls)$/i, "").trim();
-  const tokens = base.split(/\s+/).filter(Boolean);
-
-  if (tokens.length < 5) {
-    return { flightNumber: "", manifestNumber: base };
-  }
-
-  return {
-    flightNumber: `${tokens[0]} ${tokens[1]}`,
-    manifestNumber: `${tokens[2]} ${tokens[3]} ${tokens[4]}`,
-  };
-}
-
-// Parses a single Excel file (as ArrayBuffer) into manifest/flight number + row data.
-// - First row = headers (fixed across all files)
-// - AWB_COLUMN_HEADER column -> becomes the real `awb_number` column
-// - Every other header -> becomes a key inside extra_data (JSONB)
-// - Blank cells -> stored as null (not omitted), so the table renderer
-//   always knows the column exists even when empty for that row.
 export function parseManifestExcel(
   filename: string,
-  fileBuffer: ArrayBuffer
-): ParsedFile {
-  const workbook = XLSX.read(fileBuffer, { type: "array" });
-  const firstSheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[firstSheetName];
+  buffer: ArrayBuffer
+): ParseResult {
+  const wb = XLSX.read(buffer, { type: "array" });
+  const sheetName = wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  if (!sheet) throw new Error("Excel file has no sheets.");
 
-  const raw: any[][] = XLSX.utils.sheet_to_json(sheet, {
+  const aoa: any[][] = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
-    defval: null,
+    defval: "",
+    blankrows: false,
   });
+  if (aoa.length === 0) throw new Error("Excel file is empty.");
 
-  if (raw.length === 0) {
-    throw new Error(`File "${filename}" is empty.`);
-  }
+  const { rowIndex: headerRowIndex, headers } = findHeaderRow(aoa);
 
-  const headers = raw[0].map((h) => (h === null ? "" : String(h).trim()));
-
-  // Normalized match first (trims, collapses internal whitespace, ignores
-  // case) — catches real-world header variations like "Tracking Number "
-  // or a non-breaking space between words that a plain string match
-  // would miss. If nothing matches by name at all, falls back to the
-  // FIRST column, since that's confirmed to be where it lives in your
-  // files — this means upload never hard-fails on a header-text mismatch.
-  const normalize = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
-  let awbColIndex = headers.findIndex((h) => normalize(h) === normalize(AWB_COLUMN_HEADER));
-
-  if (awbColIndex === -1) {
-    awbColIndex = 0; // confirmed: Tracking Number is always the first column
-  }
-
-  const dataRows = raw.slice(1).filter((row) => row.some((cell) => cell !== null));
-
-  // Flight/manifest number: prefer the dedicated column's value from the
-  // first data row (it's a manifest-level attribute, so every row in the
-  // file should carry the same value) — fall back to the filename if that
-  // column doesn't exist or its first value is blank.
-  const manifestRefColIndex = headers.findIndex(
-    (h) => normalize(h) === normalize(MANIFEST_FLIGHT_COLUMN_HEADER)
-  );
-  const columnValue =
-    manifestRefColIndex !== -1 && dataRows.length > 0
-      ? dataRows[0][manifestRefColIndex]
-      : null;
-  const sourceString =
-    columnValue !== null && columnValue !== undefined && String(columnValue).trim() !== ""
-      ? String(columnValue).trim()
-      : filename;
-
-  const { flightNumber, manifestNumber } = parseFlightAndManifest(sourceString);
-
-  const rows: ParsedRow[] = dataRows.map((row) => {
-    const awb = row[awbColIndex];
-    if (awb === null || awb === undefined || String(awb).trim() === "") {
-      throw new Error(`Missing AWB number in "${filename}" — every row must have one.`);
+  // --- Manifest source string (column > filename) ---
+  const manifestColIdx = findColumnIndex(headers, [
+    normalizeHeader(MANIFEST_FLIGHT_COLUMN_HEADER),
+  ]);
+  let manifestSource = filename;
+  if (manifestColIdx >= 0) {
+    for (let r = headerRowIndex + 1; r < aoa.length; r++) {
+      const v = cleanValue(aoa[r]?.[manifestColIdx]);
+      if (v) { manifestSource = v; break; }
     }
+  }
+  const { flightNumber, manifestNumber } = parseFlightAndManifest(manifestSource);
 
-    const extra_data: Record<string, string | number | null> = {};
-    headers.forEach((header, idx) => {
-      if (idx === awbColIndex || header === "") return;
-      const cell = row[idx];
-      extra_data[header] = cell === undefined ? null : cell;
+  // --- AWB / Tracking column ---
+  // Primary: match "Tracking Number" (your header)
+  let awbColIdx = findColumnIndex(headers, AWB_HEADER_CANDIDATES);
+
+  // Fallback: use the very first column (column A) if it has data
+  if (awbColIdx < 0) {
+    for (let c = 0; c < headers.length; c++) {
+      const sample = cleanValue(aoa[headerRowIndex + 1]?.[c]);
+      if (sample) { awbColIdx = c; break; }
+    }
+  }
+
+  if (awbColIdx < 0) {
+    throw new Error(
+      `Could not find a Tracking/AWB column. Headers found: [${headers.join(" | ")}]. ` +
+      `Add a "Tracking Number" column (column A) and try again.`
+    );
+  }
+
+  // --- Build rows ---
+  const rows: ParsedRow[] = [];
+  for (let r = headerRowIndex + 1; r < aoa.length; r++) {
+    const row = aoa[r];
+    if (!row || row.length === 0) continue;
+
+    const awb = cleanAwb(row[awbColIdx]);
+    if (!awb) continue;
+
+    const extra_data: Record<string, any> = {};
+    headers.forEach((h, c) => {
+      if (!h) return;
+      extra_data[h] = cleanValue(row[c]);
     });
 
-    return {
-      awb_number: String(awb).trim(),
-      extra_data,
-    };
-  });
+    rows.push({ awb_number: awb, extra_data });
+  }
 
-  return {
-    manifestNumber,
-    flightNumber,
-    rows,
-  };
+  if (rows.length === 0) {
+    throw new Error(
+      `No data rows found below the header. ` +
+      `Tracking column detected: "${headers[awbColIdx] ?? "?"}" (index ${awbColIdx}). ` +
+      `Verify the file actually has data in that column.`
+    );
+  }
+
+  return { manifestNumber, flightNumber, rows };
 }
