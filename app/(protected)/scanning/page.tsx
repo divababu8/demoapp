@@ -6,6 +6,7 @@ import {
   COUNTRY_CODE_COLUMN_HEADER,
   BOX2_MESSAGE_COLUMN_HEADER,
   evaluateCountry,
+  getAeBox2Value,
 } from "@/lib/countryInspection";
 
 const AWB_REGEX = /^\d{8,32}$/;
@@ -272,13 +273,26 @@ export default function ScanningPage() {
     return evaluateCountry(rawCode);
   }, [result]);
 
-  // Box2 message — always read from AE (VAT ID#/TIN#), regardless of country
-  const box2Message = useMemo(() => {
+  // AE-column value — always shown as a line in Box2 when non-empty
+  const aeBox2Value = useMemo(() => {
     if (!result) return "";
-    const raw = result.bill.extra_data?.[BOX2_MESSAGE_COLUMN_HEADER];
-    if (raw === null || raw === undefined) return "";
-    return String(raw).trim();
+    return getAeBox2Value(result.bill.extra_data);
   }, [result]);
+
+  // Box2 lines:
+  //   Named country  → ["COUNTRYNAME_PHYSICAL", <AE value>]
+  //   Other country  → [<AE value>] (or empty if AE blank)
+  const box2Lines = useMemo(() => {
+    const lines: string[] = [];
+    if (inspection?.namedPhysicalLine) lines.push(inspection.namedPhysicalLine);
+    if (aeBox2Value) lines.push(aeBox2Value);
+    return lines;
+  }, [inspection, aeBox2Value]);
+
+  // Box1: red with "PHYSICAL INSPECTION" when flagged; empty green otherwise
+  const isRed = inspection?.level === "red";
+  const box1Text = isRed ? (inspection?.box1Message ?? "") : "";
+  const box1Class = isRed ? "insp-box-red" : "insp-box-green";
 
   const trackingNumberText = result ? result.bill.awb_number : "—";
   const flightNoText = result ? (result.bill.flight_number || "—") : "—";
@@ -289,11 +303,6 @@ export default function ScanningPage() {
     : result.justScanned
       ? "SCANNED NOW"
       : `ALREADY SCANNED (searched ${result.searchCount}×)`;
-
-  // Box1: red with inspection message if country flagged; empty green otherwise
-  const isRed = inspection?.level === "red";
-  const box1Text = isRed ? (inspection?.box1Message ?? "") : "";
-  const box1Class = isRed ? "insp-box-red" : "insp-box-green";
 
   return (
     <div className="scan-page">
@@ -356,9 +365,11 @@ export default function ScanningPage() {
           value={result ? box1Text : "—"}
           className={`insp-textarea ${result ? box1Class : "insp-box-green"}`}
         />
-        {result && box2Message && (
+        {result && box2Lines.length > 0 && (
           <div className={`insp-box2 ${isRed ? "insp-box2-red" : ""}`}>
-            {box2Message}
+            {box2Lines.map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
           </div>
         )}
       </div>

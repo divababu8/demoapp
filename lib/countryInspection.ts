@@ -1,77 +1,61 @@
-// ---------------------------------------------------------------------
-// CONFIG — which Excel column holds the country code that drives the
-// Manifest description box on the Scanning page.
-// Confirmed: column G, "Shpr Ctry" (Shipper/origin country).
-// ---------------------------------------------------------------------
-export const COUNTRY_CODE_COLUMN_HEADER = "Shpr Ctry";
-/** Header of the Excel column that supplies the Box2 message (AE). */
-export const BOX2_MESSAGE_COLUMN_HEADER = "VAT ID#/TIN#";
+/* =====================================================================
+   COUNTRY INSPECTION — flags, named list, Box1/Box2 rules
+   ===================================================================== */
 
-export const COUNTRY_NAMES: Record<string, string> = {
-  AF: "Afghanistan",
-  AT: "Austria",
-  BD: "Bangladesh",
-  BE: "Belgium",
-  BG: "Bulgaria",
-  DE: "Germany",
-  DZ: "Algeria",
-  GB: "United Kingdom",
-  GH: "Ghana",
-  IN: "India",
-  KE: "Kenya",
-  LB: "Lebanon",
-  MA: "Morocco",
-  NG: "Nigeria",
-  NL: "Netherlands",
-  PH: "Philippines",
-  PK: "Pakistan",
-  SD: "Sudan",
-  SY: "Syria",
-  TH: "Thailand",
-  TN: "Tunisia",
-  TR: "Turkey",
-  TZ: "Tanzania",
-  VN: "Vietnam",
-  ZA: "South Africa",
-  EG: "Egypt",
-  HK: "Hong Kong",
-  JO: "Jordan",
-  OM: "Oman",
+export const COUNTRY_CODE_COLUMN_HEADER = "Shpr Ctry";
+export const BOX2_MESSAGE_COLUMN_HEADER = "VAT ID#/TIN#"; // Excel col AE
+
+/** Country codes whose Box2 shows COUNTRYNAME_PHYSICAL above the AE value. */
+const NAMED_PHYSICAL = new Set(["AT", "DE", "TH", "TR", "VN"]);
+
+/** All country codes that trigger a red PHYSICAL INSPECTION Box1. */
+const FLAGGED = new Set([
+  "AF", "AT", "BD", "BE", "BG", "DE", "DZ", "GB", "GH", "IN", "KE", "LB",
+  "MA", "NG", "NL", "PH", "PK", "SD", "SY", "TH", "TN", "TR", "TZ", "VN",
+  "ZA", "EG", "HK", "JO", "OM",
+]);
+
+/** Code -> display name, used for COUNTRYNAME_PHYSICAL on the named list. */
+const COUNTRY_NAMES: Record<string, string> = {
+  AT: "AUSTRIA",
+  DE: "GERMANY",
+  TH: "THAILAND",
+  TR: "TURKEY",
+  VN: "VIETNAM",
 };
 
-// Full list: any of these codes -> red / "PHYSICAL INSPECTION" in box 1.
-export const PHYSICAL_INSPECTION_LIST = new Set(Object.keys(COUNTRY_NAMES));
-
-// Subset of the full list: these also get the country name spelled out in
-// box 2 (e.g. "AUSTRIA_PHYSICAL"). Everything else in the full list just
-// shows "COMMERCIAL" in box 2 instead.
-export const NAMED_PHYSICAL_LIST = new Set(["AT", "DE", "TH", "TR", "VN"]);
-
-export interface InspectionResult {
-  level: "green" | "red";
+export interface CountryInspection {
+  level: "red" | "green";
   countryCode: string;
-  countryName: string | null;
-  /** Manifest description box (box 1): "" when green, "PHYSICAL INSPECTION" when red. */
+  /** Box1: "PHYSICAL INSPECTION" when red, "" when green. */
   box1Message: string;
-  /** Second box: "" when green, "COMMERCIAL" or "{COUNTRY}_PHYSICAL" when red. */
-  box2Message: string;
+  /** Box2 line 1: "COUNTRYNAME_PHYSICAL" only for the named list. "" otherwise. */
+  namedPhysicalLine: string;
 }
 
-export function evaluateCountry(rawCode: string | null | undefined): InspectionResult {
-  const code = (rawCode ?? "").trim().toUpperCase();
-  const countryName = COUNTRY_NAMES[code] ?? null;
+export function evaluateCountry(rawCode: unknown): CountryInspection {
+  const code = String(rawCode ?? "").trim().toUpperCase();
 
-  if (!code || !PHYSICAL_INSPECTION_LIST.has(code)) {
-    return { level: "green", countryCode: code, countryName, box1Message: "", box2Message: "" };
+  if (!FLAGGED.has(code)) {
+    return { level: "green", countryCode: code, box1Message: "", namedPhysicalLine: "" };
   }
+
+  const namedPhysicalLine = NAMED_PHYSICAL.has(code)
+    ? `${COUNTRY_NAMES[code] ?? code}_PHYSICAL`
+    : "";
 
   return {
     level: "red",
     countryCode: code,
-    countryName,
     box1Message: "PHYSICAL INSPECTION",
-    box2Message: NAMED_PHYSICAL_LIST.has(code) && countryName
-      ? `${countryName.toUpperCase()}_PHYSICAL`
-      : "COMMERCIAL",
+    namedPhysicalLine,
   };
+}
+
+/** Read Box2's free-form AE-column value from a bill's extra_data. */
+export function getAeBox2Value(extraData: Record<string, any> | undefined): string {
+  if (!extraData) return "";
+  const raw = extraData[BOX2_MESSAGE_COLUMN_HEADER];
+  if (raw === null || raw === undefined) return "";
+  return String(raw).trim();
 }
