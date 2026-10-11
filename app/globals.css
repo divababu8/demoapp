@@ -716,22 +716,32 @@ table.data-table {
    --------------------------------------------------------------------- */
 .scan-field-desc { margin-top: 4px !important; }
 
+/* ---------------------------------------------------------------------
+   Manifest Description — Box1 & Box2 (bigger, but no empty padding)
+   --------------------------------------------------------------------- */
 .insp-textarea {
   width: 100%;
   border-radius: 14px;
-  padding: 20px 24px;
+  padding: 14px 24px;          /* less vertical padding, no empty box feel */
   font-weight: 800;
-  font-size: 1.75rem;
+  font-size: 2.25rem;          /* BIGGER text */
   font-family: inherit;
-  line-height: 1.2;
+  line-height: 1.15;
   text-align: center;
   letter-spacing: 0.02em;
   border: 1px solid transparent;
-  resize: none; overflow: hidden; cursor: default;
-  min-height: 0; height: auto;
+  resize: none;
+  overflow: hidden;
+  cursor: default;
   box-sizing: border-box;
-  display: flex; align-items: center; justify-content: center;
+  /* fixed compact height so the box hugs the text */
+  height: 62px;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
 .insp-box-green {
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
   color: #065f46;
@@ -744,19 +754,34 @@ table.data-table {
   border-color: rgba(239, 68, 68, 0.35);
   box-shadow: 0 1px 3px rgba(239, 68, 68, 0.08);
 }
+
+/* Box2 — bigger too */
 .insp-box2 {
   margin-top: 10px;
   border-radius: 14px;
-  padding: 16px 24px;
+  padding: 14px 24px;
   text-align: center;
-  font-size: 1.4rem;
+  font-size: 1.85rem;            /* BIGGER text */
   font-weight: 800;
   letter-spacing: 0.02em;
-  line-height: 1.3;
+  line-height: 1.25;
+  height: 62px;                   /* same compact height as Box1 */
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
   color: #065f46;
   border: 1px solid rgba(16, 185, 129, 0.35);
 }
+.insp-box2-red {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.insp-box2 > div + div { margin-top: 4px; }
+
 .insp-box2-red {
   background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
   color: #991b1b;
@@ -849,8 +874,11 @@ table.data-table {
   .scan-field-row-3col .scan-readonly-search { font-size: 1.35rem; }
   .scan-readonly-lg { font-size: 1.05rem; height: 44px; }
   .scan-readonly-lg.scan-readonly-code { font-size: 1.25rem; }
-  .insp-textarea { font-size: 1.5rem; padding: 16px 20px; }
-  .insp-box2 { font-size: 1.2rem; padding: 14px 20px; }
+  
+  
+  .insp-textarea { font-size: 1.8rem; height: 54px; padding: 12px 20px; }
+  .insp-box2      { font-size: 1.5rem; height: 54px; padding: 12px 20px; }
+
   .scan-stat-hero-value { font-size: 1.6rem; }
   .scan-stat-value { font-size: 1.35rem; }
 }
