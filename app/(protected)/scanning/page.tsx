@@ -375,17 +375,17 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {/* Manifest Description — Box1 + Box2 (bigger, high visibility) */}
+      {/* Manifest Description — Box1 + Box2 */}
       <div className="scan-field-group scan-page-row scan-field-desc">
         <div className="scan-field-label">Manifest Description</div>
         <textarea
           readOnly
           rows={2}
           value={result ? box1Text : "—"}
-          className={`insp-textarea insp-textarea-lg ${result ? box1Class : "insp-box-green"}`}
+          className={`insp-textarea ${result ? box1Class : "insp-box-green"}`}
         />
         {result && box2Lines.length > 0 && (
-          <div className={`insp-box2 insp-box2-lg ${isRed ? "insp-box2-red" : ""}`}>
+          <div className={`insp-box2 ${isRed ? "insp-box2-red" : ""}`}>
             {box2Lines.map((line, i) => (
               <div key={i}>{line}</div>
             ))}
@@ -393,7 +393,7 @@ export default function ScanningPage() {
         )}
       </div>
 
-      {/* Flight + Manifest Code — big fonts */}
+      {/* Flight No + Manifest Code */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Flight No</div>
@@ -401,39 +401,36 @@ export default function ScanningPage() {
         </div>
         <div className="scan-field-group">
           <div className="scan-field-label">Manifest Code</div>
-          
-		    <div className="scan-readonly mono scan-readonly-lg scan-readonly-code">{manifestCodeText}</div>
-
+          <div className="scan-readonly mono scan-readonly-lg scan-readonly-code">{manifestCodeText}</div>
         </div>
       </div>
 
-      {/* Stats — Scan Count hero with total badge */}
+      {/* Stats — Scan Count hero + stacked Shortage/Overage */}
       <div className="scan-stats-row scan-page-row">
-  {/* Hero — Scan Count */}
-  <div className="scan-stat-pill scan-stat-hero">
-    <div className="scan-stat-total-badge">
-      Total <strong>{stats.total}</strong>
-    </div>
-    <div className="scan-stat-hero-value">
-      {stats.scanned}
-      <span className="scan-stat-hero-sep">/</span>
-      <span className="scan-stat-hero-total">{stats.total}</span>
-    </div>
-    <div className="scan-stat-label">Scanned</div>
-    <div className="scan-stat-pct">{scanPct}% complete</div>
-  </div>
+        <div className="scan-stat-pill scan-stat-hero">
+          <div className="scan-stat-total-badge">
+            Total <strong>{stats.total}</strong>
+          </div>
+          <div className="scan-stat-hero-value">
+            {stats.scanned}
+            <span className="scan-stat-hero-sep">/</span>
+            <span className="scan-stat-hero-total">{stats.total}</span>
+          </div>
+          <div className="scan-stat-label">Scanned</div>
+          <div className="scan-stat-pct">{scanPct}% complete</div>
+        </div>
 
-  {/* Right column — stacked Shortage + Overage */}
-  <div className="scan-stat-stack">
-    <div className="scan-stat-pill">
-      <div className="scan-stat-value warning">{stats.shortage}</div>
-      <div className="scan-stat-label">Shortage</div>
+        <div className="scan-stat-stack">
+          <div className="scan-stat-pill">
+            <div className="scan-stat-value warning">{stats.shortage}</div>
+            <div className="scan-stat-label">Shortage</div>
+          </div>
+          <div className="scan-stat-pill">
+            <div className="scan-stat-value danger">{stats.overage}</div>
+            <div className="scan-stat-label">Overage</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div className="scan-stat-pill">
-      <div className="scan-stat-value danger">{stats.overage}</div>
-      <div className="scan-stat-label">Overage</div>
-    </div>
-  </div>
-</div>
   );
 }
