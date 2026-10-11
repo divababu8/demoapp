@@ -375,7 +375,7 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {/* Manifest Description — Box1 + Box2 (both 590×114) */}
+      {/* Manifest Description — Box1 + Box2 */}
       <div className="scan-field-group scan-page-row scan-field-desc">
         <div className="scan-field-label">Manifest Description</div>
         <div className={`insp-textarea ${result ? box1Class : "insp-box-green"}`}>
@@ -402,7 +402,7 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {/* Stats — three cards in ONE row: Scan Count | Shortage | Overage */}
+      {/* Stats — three cards in ONE row */}
       <div className="scan-stats-row scan-page-row">
         <div className="scan-stat-pill scan-stat-hero">
           <div className="scan-stat-total-badge">
