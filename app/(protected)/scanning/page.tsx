@@ -102,11 +102,7 @@ export default function ScanningPage() {
     return () => { supabase.removeChannel(ch); };
   }, [loadIndex]);
 
-  /* ---------- Live stats ----------
-     scanned  = total bills with scan_status='scanned'
-     total    = total bills (across the current manifest/latest)
-     shortage = total - scanned (pending bills)
-     overage  = pending bills older than OVERAGE_HOURS                  */
+  /* ---------- Live stats ---------- */
   useEffect(() => {
     async function loadStats() {
       const [reportRes, ageRes, latestManifestRes] = await Promise.all([
@@ -124,8 +120,6 @@ export default function ScanningPage() {
       const now = Date.now();
       (reportRes.data ?? []).forEach((m: any) => {
         const isLatest = latestId !== null && m.manifest_id === latestId;
-        // Total is always "current manifest total" if we have a latest,
-        // otherwise all manifests combined.
         if (latestId === null || isLatest) {
           scanned += m.scanned_count ?? 0;
           total += m.total_bills ?? 0;
@@ -319,12 +313,12 @@ export default function ScanningPage() {
     ? "—"
     : result.justScanned
       ? "SCANNED NOW"
-      : `ALREADY SCANNED`;
+      : "ALREADY SCANNED";
 
   const scanPct = stats.total === 0 ? 0 : Math.round((stats.scanned / stats.total) * 100);
 
   return (
-    <div className="scan-page">
+    <div className="scan-page scan-page-fit">
       <div className="page-header scan-page-header">
         <div>
           <h1 className="page-title">Scan Shipments</h1>
@@ -363,35 +357,35 @@ export default function ScanningPage() {
 
       {notFound && <p className="scan-alert scan-page-alert">{notFound}</p>}
 
-      {/* Row 1: Tracking Number · Status · Search Count */}
-      <div className="scan-field-row scan-page-row">
-        <div className="scan-field-group">
+      {/* Row 1: Tracking Number (hero) · Status · Search Count */}
+      <div className="scan-field-row scan-page-row scan-field-row-3col">
+        <div className="scan-field-group scan-field-hero">
           <div className="scan-field-label">Tracking Number</div>
-          <div className="scan-readonly mono">{trackingNumberText}</div>
+          <div className="scan-readonly mono scan-readonly-hero">{trackingNumberText}</div>
         </div>
         <div className="scan-field-group">
           <div className="scan-field-label">Status</div>
-          <div className={`scan-readonly mono${result ? (result.justScanned ? " scan-readonly-ok" : " scan-readonly-warn") : ""}`}>
+          <div className={`scan-readonly mono scan-readonly-status${result ? (result.justScanned ? " scan-readonly-ok" : " scan-readonly-warn") : ""}`}>
             {statusLabel}
           </div>
         </div>
         <div className="scan-field-group">
-          <div className="scan-field-label">Search Count</div>
+          <div className="scan-field-label scan-field-label-search">Search Count</div>
           <div className="scan-readonly mono scan-readonly-search">{searchCountText}</div>
         </div>
       </div>
 
-      {/* Manifest Description */}
-      <div className="scan-field-group scan-page-row">
+      {/* Manifest Description — Box1 + Box2 (bigger, high visibility) */}
+      <div className="scan-field-group scan-page-row scan-field-desc">
         <div className="scan-field-label">Manifest Description</div>
         <textarea
           readOnly
           rows={2}
           value={result ? box1Text : "—"}
-          className={`insp-textarea ${result ? box1Class : "insp-box-green"}`}
+          className={`insp-textarea insp-textarea-lg ${result ? box1Class : "insp-box-green"}`}
         />
         {result && box2Lines.length > 0 && (
-          <div className={`insp-box2 ${isRed ? "insp-box2-red" : ""}`}>
+          <div className={`insp-box2 insp-box2-lg ${isRed ? "insp-box2-red" : ""}`}>
             {box2Lines.map((line, i) => (
               <div key={i}>{line}</div>
             ))}
@@ -399,19 +393,19 @@ export default function ScanningPage() {
         )}
       </div>
 
-      {/* Flight + Manifest Code */}
+      {/* Flight + Manifest Code — big fonts */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Flight No</div>
-          <div className="scan-readonly mono">{flightNoText}</div>
+          <div className="scan-readonly mono scan-readonly-lg">{flightNoText}</div>
         </div>
         <div className="scan-field-group">
           <div className="scan-field-label">Manifest Code</div>
-          <div className="scan-readonly mono scan-readonly-big">{manifestCodeText}</div>
+          <div className="scan-readonly mono scan-readonly-lg">{manifestCodeText}</div>
         </div>
       </div>
 
-      {/* Stats — Scan Count box now shows scanned/total with color + corner total */}
+      {/* Stats — Scan Count hero with total badge */}
       <div className="scan-stats-row scan-page-row">
         <div className="scan-stat-pill scan-stat-hero">
           <div className="scan-stat-total-badge">

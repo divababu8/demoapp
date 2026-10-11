@@ -1222,3 +1222,152 @@ table.data-table {
   .main { padding: 24px 18px 40px; }
   .stat-grid { flex-direction: column; }
 }
+
+
+/* =====================================================================
+   SCANNING PAGE — fit-to-viewport, high-visibility fields
+   ===================================================================== */
+
+.scan-page-fit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 100px);
+  overflow: hidden;
+}
+
+.scan-page-fit .scan-page-header {
+  margin-bottom: 4px;
+}
+
+.scan-page-fit .scan-page-row {
+  margin-top: 4px !important;
+}
+
+/* ---------------------------------------------------------------------
+   3-column top row: Tracking Number | Status | Search Count
+   — Grid with explicit widths so all three sit on ONE line.
+   --------------------------------------------------------------------- */
+.scan-field-row-3col {
+  display: grid !important;
+  grid-template-columns: minmax(320px, 2.2fr) minmax(180px, 1fr) minmax(160px, 0.9fr) !important;
+  gap: 12px;
+  align-items: stretch;
+  flex-wrap: nowrap;
+}
+
+/* Ensure each group inside the 3-col row stretches to the same height */
+.scan-field-row-3col .scan-field-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Tracking Number — hero, biggest */
+.scan-field-hero .scan-readonly-hero {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 14px 16px;
+  color: #1e293b;
+  background: #eef2ff;
+  border: 2px solid #c7d2fe;
+  border-radius: 10px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status — same vertical height as hero */
+.scan-readonly-status {
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 14px 16px;
+  letter-spacing: 0.02em;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* Search Count — big bold on indigo tint */
+.scan-readonly-search {
+  font-size: 1.5rem;
+  font-weight: 800;
+  padding: 14px 16px;
+  color: #4338ca;
+  background: #eef2ff;
+  border: 2px solid #c7d2fe;
+  border-radius: 10px;
+  text-align: center;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+}
+.scan-field-label-search {
+  color: #4338ca !important;
+  font-weight: 800 !important;
+}
+
+/* Flight No & Manifest Code — bigger */
+.scan-readonly-lg {
+  font-size: 1.15rem;
+  font-weight: 700;
+  padding: 12px 16px;
+  letter-spacing: 0.02em;
+}
+
+/* Manifest Description — bigger Box1 + Box2 */
+.scan-field-desc {
+  margin-top: 6px !important;
+}
+.insp-textarea-lg {
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 12px 16px;
+  min-height: 56px;
+  line-height: 1.35;
+}
+.insp-box2-lg {
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 10px 14px;
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
+/* Compact stat row on this page */
+.scan-page-fit .scan-stats-row {
+  margin-top: 6px !important;
+}
+.scan-page-fit .scan-stat-pill {
+  padding: 10px 12px;
+}
+.scan-page-fit .scan-stat-hero-value {
+  font-size: 1.5rem;
+}
+.scan-page-fit .scan-stat-value {
+  font-size: 1.25rem;
+}
+
+/* On narrow screens, drop to 1 column so it never wraps awkwardly */
+@media (max-width: 900px) {
+  .scan-field-row-3col {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .scan-field-row-3col .scan-field-hero {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Short viewports: shrink a touch but keep everything on one screen */
+@media (max-height: 800px) {
+  .scan-field-hero .scan-readonly-hero { font-size: 1.3rem; }
+  .scan-readonly-search { font-size: 1.3rem; }
+  .scan-readonly-lg { font-size: 1rem; }
+  .scan-page-fit .scan-stat-hero-value { font-size: 1.35rem; }
+}
