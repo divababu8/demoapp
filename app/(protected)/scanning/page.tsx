@@ -407,29 +407,29 @@ export default function ScanningPage() {
 
       {/* Stats — Scan Count hero with total badge */}
       <div className="scan-stats-row scan-page-row">
-        <div className="scan-stat-pill scan-stat-hero">
-          <div className="scan-stat-total-badge">
-            Total <strong>{stats.total}</strong>
-          </div>
-          <div className="scan-stat-hero-value">
-            {stats.scanned}
-            <span className="scan-stat-hero-sep">/</span>
-            <span className="scan-stat-hero-total">{stats.total}</span>
-          </div>
-          <div className="scan-stat-label">Scanned</div>
-          <div className="scan-stat-pct">{scanPct}% complete</div>
-        </div>
+  <div className="scan-stat-pill scan-stat-hero">
+    <div className="scan-stat-total-badge">
+      Total <strong>{stats.total}</strong>
+    </div>
+    <div className="scan-stat-hero-value">
+      {stats.scanned}
+      <span className="scan-stat-hero-sep">/</span>
+      <span className="scan-stat-hero-total">{stats.total}</span>
+    </div>
+		<div className="scan-stat-label">Scanned</div>
+			<div className="scan-stat-pct">{scanPct}% complete</div>
+		</div>
 
-        <div className="scan-stat-pill">
-          <div className="scan-stat-value warning">{stats.shortage}</div>
-          <div className="scan-stat-label">Shortage</div>
-        </div>
+	  <div className="scan-stat-pill">
+		<div className="scan-stat-value warning">{stats.shortage}</div>
+		<div className="scan-stat-label">Shortage</div>
+	  </div>
 
-        <div className="scan-stat-pill">
-          <div className="scan-stat-value danger">{stats.overage}</div>
-          <div className="scan-stat-label">Overage</div>
-        </div>
-      </div>
+	  <div className="scan-stat-pill">
+		<div className="scan-stat-value danger">{stats.overage}</div>
+		<div className="scan-stat-label">Overage</div>
+	 </div>
+</div>
     </div>
   );
 }
