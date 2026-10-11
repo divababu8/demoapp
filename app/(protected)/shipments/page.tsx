@@ -4,9 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 /* =====================================================================
-   COLUMN MAPPING (unchanged — keeping your exact mapping logic)
+   COLUMN MAPPING
+   ---------------------------------------------------------------------
+   Flight number now comes from manifests.flight_number (parsed from
+   the filename at upload time). FLIGHT_KEYS is retained only as a
+   fallback for older rows where extra_data still holds it.
    ===================================================================== */
-const FLIGHT_KEYS = ["VAT ID#/TIN#", "Flight No", "Flight No.", "Flight", "FLIGHT", "flight_no", "flightNo"];
+const FLIGHT_KEYS = ["Flight No", "Flight No.", "Flight", "FLIGHT", "flight_no", "flightNo"];
+// NOTE: "VAT ID#/TIN#" intentionally removed — that column is now
+// used for Box2 on the Scanning page, not as a flight number source.
+
 const AIRPORT_KEYS = ["Recip Ctry", "Airport", "Airport Code", "Destination", "Port", "AIRPORT", "airport"];
 
 const LABEL_MAP: Record<string, string> = {
@@ -18,8 +25,9 @@ const LABEL_MAP: Record<string, string> = {
   "Recip Phone": "Recipient Phone", "Shpr Ref Notes": "Shipper Ref Notes", "No Pieces": "Pieces",
   "Master Tracking Nbr": "Master Tracking #", "Special Handling Codes": "Special Handling",
   "Shpmt Weight": "Weight", "HSCODE": "HS Code", "Commodity Desc": "Commodity",
-  "Custom Value": "Customs Value", "VAT ID#/TIN#": "Flight No", "CountryofOriginCoded": "Country of Origin",
-  "CertificateNumber": "Certificate #", "TransactionType": "Transaction Type", "ImporterCode": "Importer Code",
+  "Custom Value": "Customs Value", "VAT ID#/TIN#": "VAT ID / TIN",
+  "CountryofOriginCoded": "Country of Origin", "CertificateNumber": "Certificate #",
+  "TransactionType": "Transaction Type", "ImporterCode": "Importer Code",
   "INCOTERMSCoded": "Incoterms", "fright Costs": "Freight Cost", "ExemptionTypeCoded": "Exemption Type",
   "ApprovalNumber": "Approval #", "SettlementIndicator": "Settlement", "Brand": "Brand", "Model": "Model",
   "MOPHRegNo": "MOPH Reg #", "PaymentMode": "Payment Mode", "DecSubmitType": "Declaration Type",
@@ -61,6 +69,7 @@ interface ShipmentRow {
   manifest_id: string;
   manifest_number: string;
   manifest_upload_date: string;
+  flight_number: string | null;    // ← NEW: from manifests.flight_number
 }
 
 /* =====================================================================
@@ -86,7 +95,15 @@ function pickByKeys(row: ShipmentRow, keys: string[]): string {
   return "–";
 }
 
-const getFlight = (r: ShipmentRow) => pickByKeys(r, FLIGHT_KEYS);
+/** Flight number — primary source is manifests.flight_number; fall back
+ *  to the extra_data keys only if that's missing (legacy rows). */
+function getFlight(r: ShipmentRow): string {
+  if (r.flight_number && String(r.flight_number).trim() !== "") {
+    return String(r.flight_number);
+  }
+  return pickByKeys(r, FLIGHT_KEYS);
+}
+
 const getAirport = (r: ShipmentRow) => pickByKeys(r, AIRPORT_KEYS);
 
 /* =====================================================================
@@ -117,9 +134,10 @@ export default function ShipmentsPage() {
   async function loadRows() {
     setLoading(true);
 
+    // Include flight_number from the joined manifests row
     let q = supabase
       .from("bills")
-      .select("id, awb_number, scan_status, scanned_at, created_at, extra_data, manifest_id, manifests(manifest_number, upload_date)")
+      .select("id, awb_number, scan_status, scanned_at, created_at, extra_data, manifest_id, manifests(manifest_number, upload_date, flight_number)")
       .gte("created_at", `${dateFrom}T00:00:00`)
       .lte("created_at", `${dateTo}T23:59:59`)
       .order("created_at", { ascending: true })
@@ -141,6 +159,7 @@ export default function ShipmentsPage() {
       manifest_id: r.manifest_id,
       manifest_number: r.manifests?.manifest_number ?? "–",
       manifest_upload_date: r.manifests?.upload_date ?? r.created_at,
+      flight_number: r.manifests?.flight_number ?? null,   // ← NEW
     })));
     setLoading(false);
   }
@@ -157,6 +176,7 @@ export default function ShipmentsPage() {
     const ch = supabase
       .channel("shipments-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "manifests" }, scheduleReload) // ← listen to manifests too
       .subscribe();
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -243,7 +263,7 @@ export default function ShipmentsPage() {
         </div>
       </div>
 
-      {/* ============ KPI CARDS (Vibrant) ============ */}
+      {/* ============ KPI CARDS ============ */}
       <div className="kpi-grid">
         <KpiCard tone="primary" label="Total bills" value={stats.total} hint="In current view" icon={<IconBox />} />
         <KpiCard tone="success" label="Scanned" value={stats.scanned}
@@ -266,7 +286,7 @@ export default function ShipmentsPage() {
 
           <div className="field">
             <label>Flight No</label>
-            <input value={flightFilter} onChange={(e) => setFlightFilter(e.target.value)} placeholder="e.g. QR123" />
+            <input value={flightFilter} onChange={(e) => setFlightFilter(e.target.value)} placeholder="e.g. QR 1019" />
           </div>
 
           <div className="field">

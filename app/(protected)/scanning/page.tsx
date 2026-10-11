@@ -29,7 +29,12 @@ interface ScanResult {
   };
 }
 
-interface ScanStats { scanned: number; shortage: number; overage: number; }
+interface ScanStats {
+  scanned: number;
+  total: number;
+  shortage: number;
+  overage: number;
+}
 
 const OVERAGE_HOURS = 10;
 
@@ -39,7 +44,7 @@ export default function ScanningPage() {
   const [notFound, setNotFound] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [flash, setFlash] = useState<"ok" | "warn" | "err" | null>(null);
-  const [stats, setStats] = useState<ScanStats>({ scanned: 0, shortage: 0, overage: 0 });
+  const [stats, setStats] = useState<ScanStats>({ scanned: 0, total: 0, shortage: 0, overage: 0 });
   const [indexSize, setIndexSize] = useState(0);
 
   const indexRef = useRef<Map<string, string>>(new Map());
@@ -97,27 +102,42 @@ export default function ScanningPage() {
     return () => { supabase.removeChannel(ch); };
   }, [loadIndex]);
 
-  /* ---------- Live stats ---------- */
+  /* ---------- Live stats ----------
+     scanned  = total bills with scan_status='scanned'
+     total    = total bills (across the current manifest/latest)
+     shortage = total - scanned (pending bills)
+     overage  = pending bills older than OVERAGE_HOURS                  */
   useEffect(() => {
     async function loadStats() {
-      const [reportRes, ageRes] = await Promise.all([
-        supabase.from("manifest_report").select("manifest_id, scanned_count, pending_count"),
+      const [reportRes, ageRes, latestManifestRes] = await Promise.all([
+        supabase.from("manifest_report").select("manifest_id, total_bills, scanned_count, pending_count"),
         supabase.from("manifest_pending_age").select("manifest_id, oldest_pending_at"),
+        supabase.from("manifests").select("id").order("upload_date", { ascending: false }).limit(1).maybeSingle(),
       ]);
+
       const ageByManifest = new Map<string, string>();
       (ageRes.data ?? []).forEach((r: any) => ageByManifest.set(r.manifest_id, r.oldest_pending_at));
 
-      let scanned = 0, shortage = 0, overage = 0;
+      const latestId = latestManifestRes.data?.id ?? null;
+
+      let scanned = 0, total = 0, shortage = 0, overage = 0;
       const now = Date.now();
       (reportRes.data ?? []).forEach((m: any) => {
-        scanned += m.scanned_count ?? 0;
-        shortage += m.pending_count ?? 0;
-        const oldest = ageByManifest.get(m.manifest_id);
-        if (oldest && (now - new Date(oldest).getTime()) / 36e5 >= OVERAGE_HOURS) {
-          overage += m.pending_count ?? 0;
+        const isLatest = latestId !== null && m.manifest_id === latestId;
+        // Total is always "current manifest total" if we have a latest,
+        // otherwise all manifests combined.
+        if (latestId === null || isLatest) {
+          scanned += m.scanned_count ?? 0;
+          total += m.total_bills ?? 0;
+          shortage += m.pending_count ?? 0;
+          const oldest = ageByManifest.get(m.manifest_id);
+          if (oldest && (now - new Date(oldest).getTime()) / 36e5 >= OVERAGE_HOURS) {
+            overage += m.pending_count ?? 0;
+          }
         }
       });
-      setStats({ scanned, shortage, overage });
+
+      setStats({ scanned, total, shortage, overage });
     }
     loadStats();
 
@@ -130,6 +150,7 @@ export default function ScanningPage() {
     const ch = supabase
       .channel("scanning-stats-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "manifests" }, scheduleReload)
       .subscribe();
 
     return () => {
@@ -273,15 +294,11 @@ export default function ScanningPage() {
     return evaluateCountry(rawCode);
   }, [result]);
 
-  // AE-column value — always shown as a line in Box2 when non-empty
   const aeBox2Value = useMemo(() => {
     if (!result) return "";
     return getAeBox2Value(result.bill.extra_data);
   }, [result]);
 
-  // Box2 lines:
-  //   Named country  → ["COUNTRYNAME_PHYSICAL", <AE value>]
-  //   Other country  → [<AE value>] (or empty if AE blank)
   const box2Lines = useMemo(() => {
     const lines: string[] = [];
     if (inspection?.namedPhysicalLine) lines.push(inspection.namedPhysicalLine);
@@ -289,7 +306,6 @@ export default function ScanningPage() {
     return lines;
   }, [inspection, aeBox2Value]);
 
-  // Box1: red with "PHYSICAL INSPECTION" when flagged; empty green otherwise
   const isRed = inspection?.level === "red";
   const box1Text = isRed ? (inspection?.box1Message ?? "") : "";
   const box1Class = isRed ? "insp-box-red" : "insp-box-green";
@@ -297,12 +313,15 @@ export default function ScanningPage() {
   const trackingNumberText = result ? result.bill.awb_number : "—";
   const flightNoText = result ? (result.bill.flight_number || "—") : "—";
   const manifestCodeText = result ? result.bill.manifest_number : "—";
+  const searchCountText = result ? String(result.searchCount) : "—";
 
   const statusLabel = !result
     ? "—"
     : result.justScanned
       ? "SCANNED NOW"
-      : `ALREADY SCANNED (searched ${result.searchCount}×)`;
+      : `ALREADY SCANNED`;
+
+  const scanPct = stats.total === 0 ? 0 : Math.round((stats.scanned / stats.total) * 100);
 
   return (
     <div className="scan-page">
@@ -344,6 +363,7 @@ export default function ScanningPage() {
 
       {notFound && <p className="scan-alert scan-page-alert">{notFound}</p>}
 
+      {/* Row 1: Tracking Number · Status · Search Count */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Tracking Number</div>
@@ -355,8 +375,13 @@ export default function ScanningPage() {
             {statusLabel}
           </div>
         </div>
+        <div className="scan-field-group">
+          <div className="scan-field-label">Search Count</div>
+          <div className="scan-readonly mono scan-readonly-search">{searchCountText}</div>
+        </div>
       </div>
 
+      {/* Manifest Description */}
       <div className="scan-field-group scan-page-row">
         <div className="scan-field-label">Manifest Description</div>
         <textarea
@@ -374,6 +399,7 @@ export default function ScanningPage() {
         )}
       </div>
 
+      {/* Flight + Manifest Code */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Flight No</div>
@@ -385,15 +411,26 @@ export default function ScanningPage() {
         </div>
       </div>
 
+      {/* Stats — Scan Count box now shows scanned/total with color + corner total */}
       <div className="scan-stats-row scan-page-row">
-        <div className="scan-stat-pill">
-          <div className="scan-stat-value">{stats.scanned}</div>
-          <div className="scan-stat-label">Scan Count</div>
+        <div className="scan-stat-pill scan-stat-hero">
+          <div className="scan-stat-total-badge">
+            Total <strong>{stats.total}</strong>
+          </div>
+          <div className="scan-stat-hero-value">
+            {stats.scanned}
+            <span className="scan-stat-hero-sep">/</span>
+            <span className="scan-stat-hero-total">{stats.total}</span>
+          </div>
+          <div className="scan-stat-label">Scanned</div>
+          <div className="scan-stat-pct">{scanPct}% complete</div>
         </div>
+
         <div className="scan-stat-pill">
-          <div className="scan-stat-value">{stats.shortage}</div>
+          <div className="scan-stat-value warning">{stats.shortage}</div>
           <div className="scan-stat-label">Shortage</div>
         </div>
+
         <div className="scan-stat-pill">
           <div className="scan-stat-value danger">{stats.overage}</div>
           <div className="scan-stat-label">Overage</div>
