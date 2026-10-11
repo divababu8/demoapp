@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAuthHeader, supabase } from "@/lib/supabaseClient";
-import { COUNTRY_CODE_COLUMN_HEADER, evaluateCountry } from "@/lib/countryInspection";
+import {
+  COUNTRY_CODE_COLUMN_HEADER,
+  BOX2_MESSAGE_COLUMN_HEADER,
+  evaluateCountry,
+} from "@/lib/countryInspection";
 
 const AWB_REGEX = /^\d{8,32}$/;
-const AUTO_RESET_MS = 4000;
 const AUTO_SUBMIT_DEBOUNCE_MS = 140;
 
 interface ScanResult {
@@ -38,10 +41,6 @@ export default function ScanningPage() {
   const [stats, setStats] = useState<ScanStats>({ scanned: 0, shortage: 0, overage: 0 });
   const [indexSize, setIndexSize] = useState(0);
 
-  // Client-side index: latest manifest's AWB -> bill_id. Only two fields
-  // are stored per bill (id + awb_number). Both the full AWB and its
-  // 8-digit suffix are keys, so scanners that prefix extra digits still
-  // resolve without a network call.
   const indexRef = useRef<Map<string, string>>(new Map());
   const latestManifestIdRef = useRef<string | null>(null);
 
@@ -49,25 +48,9 @@ export default function ScanningPage() {
   const requestSeq = useRef(0);
 
   const autoSubmitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSubmittedRef = useRef<string | null>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
-
-  /* ---------- helpers ---------- */
-  function cancelAutoReset() {
-    if (autoResetTimer.current) { clearTimeout(autoResetTimer.current); autoResetTimer.current = null; }
-  }
-  function scheduleAutoReset() {
-    cancelAutoReset();
-    autoResetTimer.current = setTimeout(() => {
-      if (inputRef.current && inputRef.current.value.trim().length === 0) {
-        setResult(null); setNotFound(null); setFlash(null);
-        lastSubmittedRef.current = null;
-        inputRef.current?.focus();
-      }
-    }, AUTO_RESET_MS);
-  }
 
   /* ---------- Load client-side index (latest manifest only) ---------- */
   const loadIndex = useCallback(async () => {
@@ -151,7 +134,6 @@ export default function ScanningPage() {
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
-      if (autoResetTimer.current) clearTimeout(autoResetTimer.current);
       supabase.removeChannel(ch);
     };
   }, []);
@@ -165,12 +147,9 @@ export default function ScanningPage() {
       setNotFound(`"${awb}" is not a valid tracking number.`);
       setResult(null); setFlash("err"); beep("err");
       lastSubmittedRef.current = awb;
-      scheduleAutoReset();
       return;
     }
 
-    // Client-side short-circuit: if the AWB (or its 8-digit suffix)
-    // isn't in the latest manifest's index, show "not found" instantly.
     const map = indexRef.current;
     const exactHit = map.has(awb);
     const suffixHit = !exactHit && awb.length > 8 && map.has(awb.slice(-8));
@@ -179,7 +158,6 @@ export default function ScanningPage() {
       setNotFound(`Tracking number ${awb} not found in the current manifest (${indexSize} bills loaded).`);
       setResult(null); setFlash("err"); beep("err");
       lastSubmittedRef.current = awb;
-      scheduleAutoReset();
       return;
     }
 
@@ -188,7 +166,6 @@ export default function ScanningPage() {
     lastSubmittedRef.current = awb;
     setPending(true);
     setNotFound(null);
-    cancelAutoReset();
     inputRef.current?.focus();
 
     try {
@@ -204,7 +181,6 @@ export default function ScanningPage() {
       if (res.status === 401) {
         setNotFound("Your session expired — please log in again.");
         setResult(null); setFlash("err"); beep("err");
-        scheduleAutoReset();
         return;
       }
 
@@ -213,7 +189,6 @@ export default function ScanningPage() {
       if (!data.found) {
         setNotFound(data.message ?? `Tracking number ${awb} not found.`);
         setResult(null); setFlash("err"); beep("err");
-        scheduleAutoReset();
         return;
       }
 
@@ -221,12 +196,10 @@ export default function ScanningPage() {
       setNotFound(null);
       setFlash(data.justScanned ? "ok" : "warn");
       beep(data.justScanned ? "ok" : "warn");
-      scheduleAutoReset();
     } catch {
       if (mySeq !== requestSeq.current) return;
       setNotFound("Network error — could not reach the server.");
       setResult(null); setFlash("err"); beep("err");
-      scheduleAutoReset();
     } finally {
       if (mySeq === requestSeq.current) setPending(false);
     }
@@ -236,7 +209,6 @@ export default function ScanningPage() {
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     setInput(value);
-    cancelAutoReset();
 
     if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
 
@@ -289,7 +261,6 @@ export default function ScanningPage() {
     setInput(""); setResult(null); setNotFound(null); setFlash(null);
     lastSubmittedRef.current = null;
     if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
-    cancelAutoReset();
     requestSeq.current++;
     inputRef.current?.focus();
   }
@@ -301,6 +272,14 @@ export default function ScanningPage() {
     return evaluateCountry(rawCode);
   }, [result]);
 
+  // Box2 message — always read from AE (VAT ID#/TIN#), regardless of country
+  const box2Message = useMemo(() => {
+    if (!result) return "";
+    const raw = result.bill.extra_data?.[BOX2_MESSAGE_COLUMN_HEADER];
+    if (raw === null || raw === undefined) return "";
+    return String(raw).trim();
+  }, [result]);
+
   const trackingNumberText = result ? result.bill.awb_number : "—";
   const flightNoText = result ? (result.bill.flight_number || "—") : "—";
   const manifestCodeText = result ? result.bill.manifest_number : "—";
@@ -310,6 +289,11 @@ export default function ScanningPage() {
     : result.justScanned
       ? "SCANNED NOW"
       : `ALREADY SCANNED (searched ${result.searchCount}×)`;
+
+  // Box1: red with inspection message if country flagged; empty green otherwise
+  const isRed = inspection?.level === "red";
+  const box1Text = isRed ? (inspection?.box1Message ?? "") : "";
+  const box1Class = isRed ? "insp-box-red" : "insp-box-green";
 
   return (
     <div className="scan-page">
@@ -367,16 +351,15 @@ export default function ScanningPage() {
       <div className="scan-field-group scan-page-row">
         <div className="scan-field-label">Manifest Description</div>
         <textarea
-          readOnly rows={2}
-          value={inspection
-            ? inspection.level === "red"
-              ? inspection.box1Message
-              : `${inspection.countryCode || "—"} — CLEARED`
-            : "—"}
-          className={`insp-textarea ${inspection ? (inspection.level === "red" ? "insp-box-red" : "insp-box-green") : "insp-box-green"}`}
+          readOnly
+          rows={2}
+          value={result ? box1Text : "—"}
+          className={`insp-textarea ${result ? box1Class : "insp-box-green"}`}
         />
-        {inspection && inspection.level === "red" && inspection.box2Message && (
-          <div className="insp-box2 insp-box2-red">{inspection.box2Message}</div>
+        {result && box2Message && (
+          <div className={`insp-box2 ${isRed ? "insp-box2-red" : ""}`}>
+            {box2Message}
+          </div>
         )}
       </div>
 

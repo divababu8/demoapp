@@ -4,6 +4,8 @@
 // Confirmed: column G, "Shpr Ctry" (Shipper/origin country).
 // ---------------------------------------------------------------------
 export const COUNTRY_CODE_COLUMN_HEADER = "Shpr Ctry";
+/** Header of the Excel column that supplies the Box2 message (AE). */
+export const BOX2_MESSAGE_COLUMN_HEADER = "VAT ID#/TIN#";
 
 export const COUNTRY_NAMES: Record<string, string> = {
   AF: "Afghanistan",
