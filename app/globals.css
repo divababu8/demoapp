@@ -1227,8 +1227,6 @@ table.data-table {
    SCANNING PAGE — fit-to-viewport, high-visibility, stable layout
    ===================================================================== */
 
-/* The page frame — no fixed max-height, no clipping. We simply tighten
-   spacing so it fits on screen naturally without cutting content. */
 .scan-page-fit {
   display: flex;
   flex-direction: column;
@@ -1241,7 +1239,6 @@ table.data-table {
 
 /* ---------------------------------------------------------------------
    3-column top row: Tracking Number | Status | Search Count
-   All three sit on ONE line, equal height, no wrapping.
    --------------------------------------------------------------------- */
 .scan-field-row-3col {
   display: grid !important;
@@ -1256,19 +1253,16 @@ table.data-table {
   min-width: 0;
   margin-top: 0 !important;
 }
-.scan-field-row-3col .scan-field-label {
-  min-height: 18px;                 /* stable label height */
-}
+.scan-field-row-3col .scan-field-label { min-height: 18px; }
 .scan-field-row-3col .scan-readonly,
 .scan-field-row-3col .scan-readonly-hero,
 .scan-field-row-3col .scan-readonly-search {
-  height: 52px;                      /* fixed height — never grows/shrinks */
+  height: 52px;
   display: flex;
   align-items: center;
   box-sizing: border-box;
 }
 
-/* Tracking Number — hero, biggest */
 .scan-field-hero .scan-readonly-hero {
   font-size: 1.4rem;
   font-weight: 700;
@@ -1283,7 +1277,6 @@ table.data-table {
   text-overflow: ellipsis;
 }
 
-/* Status — same height, bold */
 .scan-field-row-3col .scan-readonly-status {
   font-size: 1rem;
   font-weight: 700;
@@ -1291,7 +1284,6 @@ table.data-table {
   letter-spacing: 0.02em;
 }
 
-/* Search Count — big bold on indigo tint */
 .scan-field-row-3col .scan-readonly-search {
   font-size: 1.5rem;
   font-weight: 800;
@@ -1308,9 +1300,12 @@ table.data-table {
   font-weight: 800 !important;
 }
 
-/* Flight No & Manifest Code — bigger, fixed height */
+/* ---------------------------------------------------------------------
+   Flight No & Manifest Code — bigger, fixed height
+   Manifest Code font increased
+   --------------------------------------------------------------------- */
 .scan-readonly-lg {
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   font-weight: 700;
   padding: 0 16px;
   height: 48px;
@@ -1319,55 +1314,112 @@ table.data-table {
   letter-spacing: 0.02em;
   box-sizing: border-box;
 }
-
-/* Manifest Description — bigger Box1 + Box2, fixed heights */
-.scan-field-desc { margin-top: 4px !important; }
-.insp-textarea-lg {
-  font-size: 1.05rem;
-  font-weight: 700;
-  padding: 12px 16px;
-  min-height: 52px;
-  line-height: 1.35;
-}
-.insp-box2-lg {
-  font-size: 1rem;
-  font-weight: 700;
-  padding: 10px 14px;
-  margin-top: 6px;
-  line-height: 1.35;
+/* Manifest Code — extra bump */
+.scan-readonly-lg.scan-readonly-code {
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
 }
 
 /* ---------------------------------------------------------------------
-   Scan Count hero card + the two side pills
+   Manifest Description — Box1 (shorter, wider, bigger font)
+   and Box2 (restored red/green styling)
    --------------------------------------------------------------------- */
+.scan-field-desc { margin-top: 4px !important; }
 
+.insp-textarea {
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-weight: 800;
+  font-size: 1.35rem;            /* bigger font */
+  font-family: inherit;
+  line-height: 1.25;
+  text-align: center;
+  border: 1px solid transparent;
+  resize: none;
+  overflow: hidden;
+  cursor: default;
+  min-height: 0;
+  height: 48px;                  /* shorter */
+  box-sizing: border-box;
+}
+.insp-box-green { background: #d1fae5; color: #047857; border-color: rgba(16, 185, 129, 0.4); }
+.insp-box-red   { background: #fee2e2; color: #b91c1c; border-color: rgba(239, 68, 68, 0.4); }
+
+/* Box2 — keep original red/green styling, larger font */
+.insp-box2 {
+  margin-top: 8px;
+  border-radius: 12px;
+  padding: 10px 20px;
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: #d1fae5;           /* green default */
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.insp-box2-red {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* The -lg variant now just tweaks size without overriding box2 base look */
+.insp-textarea-lg { /* kept for backwards compat, no overrides */ }
+.insp-box2-lg { font-size: 1.15rem; padding: 10px 20px; margin-top: 8px; }
+
+/* ---------------------------------------------------------------------
+   BOTTOM CARDS — vertical layout, rounded corners
+   Left: hero Scan Count card (tall)
+   Right: two stacked pills (Shortage / Overage)
+   --------------------------------------------------------------------- */
 .scan-page-fit .scan-stats-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr;
   gap: 12px;
   margin-top: 4px !important;
 }
 
+/* Right column wrapper — stacks Shortage over Overage */
+.scan-stat-stack {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 12px;
+}
+
 .scan-page-fit .scan-stat-pill {
-  padding: 14px 16px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+  border-radius: 14px;           /* rounder corners */
 }
 
 .scan-page-fit .scan-stat-value {
   font-family: "IBM Plex Mono", monospace;
   font-size: 1.5rem;
   font-weight: 700;
+  line-height: 1;
+}
+.scan-page-fit .scan-stat-label {
+  font-size: 0.7rem;
+  margin-top: 6px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-/* The hero card — indigo tint with a total badge top-right */
+/* Hero card — indigo gradient, total badge top-right */
 .scan-stat-hero {
   position: relative;
   background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%) !important;
   border: 1px solid #c7d2fe !important;
+  padding: 16px 18px !important;
+  justify-content: center !important;
 }
 
 .scan-stat-total-badge {
@@ -1382,7 +1434,6 @@ table.data-table {
   border-radius: 999px;
   padding: 2px 10px;
   line-height: 1.4;
-  letter-spacing: 0.02em;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1395,10 +1446,10 @@ table.data-table {
 
 .scan-stat-hero-value {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 1.75rem;
+  font-size: 2rem;
   font-weight: 800;
   line-height: 1;
-  color: #16a34a;                /* scanned = green */
+  color: #16a34a;
   display: flex;
   align-items: baseline;
   justify-content: center;
@@ -1411,8 +1462,8 @@ table.data-table {
   margin: 0 4px;
 }
 .scan-stat-hero-total {
-  color: #4f46e5;                /* total = indigo */
-  font-size: 1.05rem;
+  color: #4f46e5;
+  font-size: 1.15rem;
   font-weight: 700;
 }
 .scan-stat-hero .scan-stat-label {
@@ -1421,25 +1472,33 @@ table.data-table {
   margin-top: 2px;
 }
 .scan-stat-pct {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: #4338ca;
-  opacity: 0.85;
-  margin-top: 2px;
+  opacity: 0.9;
+  margin-top: 4px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
-/* Short viewports — slight downscale so everything still fits */
+/* Warning / danger variants */
+.scan-stat-value.warning { color: #d97706; }
+.scan-stat-value.danger  { color: #dc2626; }
+
+/* Short viewports */
 @media (max-height: 800px) {
   .scan-field-hero .scan-readonly-hero { font-size: 1.25rem; }
   .scan-field-row-3col .scan-readonly-search { font-size: 1.35rem; }
   .scan-readonly-lg { font-size: 1.05rem; height: 44px; }
-  .scan-page-fit .scan-stat-hero-value { font-size: 1.5rem; }
+  .scan-readonly-lg.scan-readonly-code { font-size: 1.25rem; }
+  .insp-textarea { font-size: 1.15rem; height: 44px; }
+  .insp-box2 { font-size: 1rem; }
+  .scan-stat-hero-value { font-size: 1.6rem; }
   .scan-page-fit .scan-stat-value { font-size: 1.35rem; }
 }
 
-/* Narrow screens — grid drops to 1 column for the 3-col row */
+/* Narrow screens */
 @media (max-width: 900px) {
   .scan-field-row-3col { grid-template-columns: 1fr !important; }
   .scan-page-fit .scan-stats-row { grid-template-columns: 1fr; }
+  .scan-stat-stack { grid-template-rows: auto; grid-template-columns: 1fr 1fr; }
 }
