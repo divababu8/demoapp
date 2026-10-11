@@ -580,7 +580,6 @@ table.data-table {
 .scan-page .scan-page-panel { margin-bottom: 0; padding: 14px 16px; }
 .scan-page .scan-page-row { margin-top: 0 !important; }
 
-/* Main input panel */
 .scan-panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -712,32 +711,29 @@ table.data-table {
 }
 
 /* ---------------------------------------------------------------------
-   Manifest Description — Box1 & Box2 (big like hero)
+   Manifest Description — Box1 & Box2 (fixed size 590×114, big font)
    --------------------------------------------------------------------- */
 .scan-field-desc { margin-top: 4px !important; }
 
-/* ---------------------------------------------------------------------
-   Manifest Description — Box1 & Box2 (bigger, but no empty padding)
-   --------------------------------------------------------------------- */
 .insp-textarea {
-  width: 100%;
   border-radius: 14px;
-  padding: 0 24px;              /* horizontal only — height is set below */
+  padding: 12px 20px;
   font-weight: 800;
   font-size: 2.25rem;
   font-family: inherit;
-  line-height: 1;
+  line-height: 1.15;
   text-align: center;
   letter-spacing: 0.02em;
   border: 1px solid transparent;
   box-sizing: border-box;
-  height: 72px;                 /* one consistent height */
+  height: 114px;
+  width: 590px;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
-
 .insp-box-green {
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
   color: #065f46;
@@ -750,18 +746,18 @@ table.data-table {
   border-color: rgba(239, 68, 68, 0.35);
   box-shadow: 0 1px 3px rgba(239, 68, 68, 0.08);
 }
-
-/* Box2 — bigger too */
 .insp-box2 {
   margin-top: 10px;
   border-radius: 14px;
-  padding: 14px 24px;
+  padding: 12px 20px;
   text-align: center;
-  font-size: 1.85rem;            /* BIGGER text */
+  font-size: 1.85rem;
   font-weight: 800;
   letter-spacing: 0.02em;
   line-height: 1.25;
-  height: 62px;                   /* same compact height as Box1 */
+  height: 114px;
+  width: 590px;
+  max-width: 100%;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -776,29 +772,18 @@ table.data-table {
   color: #991b1b;
   border: 1px solid rgba(239, 68, 68, 0.35);
 }
-.insp-box2 > div + div { margin-top: 4px; }
-
-.insp-box2-red {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  color: #991b1b;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-}
 .insp-box2 > div + div { margin-top: 6px; }
 
 /* ---------------------------------------------------------------------
-   Bottom stats — hero Scan Count + stacked Shortage/Overage
+   Bottom stats — three cards in ONE row: Scan Count | Shortage | Overage
    --------------------------------------------------------------------- */
 .scan-stats-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: 1.6fr 1fr 1fr;
   gap: 12px;
   margin-top: 4px !important;
 }
-.scan-stat-stack {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 12px;
-}
+
 .scan-stat-pill {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -865,23 +850,19 @@ table.data-table {
 }
 
 /* Responsive */
-@media (max-height: 800px) {
-  .scan-field-hero .scan-readonly-hero { font-size: 1.25rem; }
-  .scan-field-row-3col .scan-readonly-search { font-size: 1.35rem; }
-  .scan-readonly-lg { font-size: 1.05rem; height: 44px; }
-  .scan-readonly-lg.scan-readonly-code { font-size: 1.25rem; }
-  
-  
-  .insp-textarea { font-size: 1.8rem; height: 54px; padding: 12px 20px; }
-  .insp-box2      { font-size: 1.5rem; height: 54px; padding: 12px 20px; }
-
-  .scan-stat-hero-value { font-size: 1.6rem; }
-  .scan-stat-value { font-size: 1.35rem; }
-}
 @media (max-width: 900px) {
   .scan-field-row-3col { grid-template-columns: 1fr !important; }
   .scan-stats-row { grid-template-columns: 1fr; }
-  .scan-stat-stack { grid-template-rows: auto; grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .insp-textarea,
+  .insp-box2 {
+    width: 100%;
+    height: auto;
+    min-height: 88px;
+  }
+  .insp-textarea { font-size: 1.6rem; }
+  .insp-box2 { font-size: 1.4rem; }
 }
 
 /* =====================================================================

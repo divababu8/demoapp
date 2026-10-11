@@ -375,12 +375,12 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {/* Manifest Description — Box1 + Box2 */}
+      {/* Manifest Description — Box1 + Box2 (both 590×114) */}
       <div className="scan-field-group scan-page-row scan-field-desc">
         <div className="scan-field-label">Manifest Description</div>
         <div className={`insp-textarea ${result ? box1Class : "insp-box-green"}`}>
-  {result ? box1Text : "—"}
-</div>
+          {result ? box1Text : "—"}
+        </div>
         {result && box2Lines.length > 0 && (
           <div className={`insp-box2 ${isRed ? "insp-box2-red" : ""}`}>
             {box2Lines.map((line, i) => (
@@ -402,7 +402,7 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {/* Stats — Scan Count hero + stacked Shortage/Overage */}
+      {/* Stats — three cards in ONE row: Scan Count | Shortage | Overage */}
       <div className="scan-stats-row scan-page-row">
         <div className="scan-stat-pill scan-stat-hero">
           <div className="scan-stat-total-badge">
@@ -417,15 +417,14 @@ export default function ScanningPage() {
           <div className="scan-stat-pct">{scanPct}% complete</div>
         </div>
 
-        <div className="scan-stat-stack">
-          <div className="scan-stat-pill">
-            <div className="scan-stat-value warning">{stats.shortage}</div>
-            <div className="scan-stat-label">Shortage</div>
-          </div>
-          <div className="scan-stat-pill">
-            <div className="scan-stat-value danger">{stats.overage}</div>
-            <div className="scan-stat-label">Overage</div>
-          </div>
+        <div className="scan-stat-pill">
+          <div className="scan-stat-value warning">{stats.shortage}</div>
+          <div className="scan-stat-label">Shortage</div>
+        </div>
+
+        <div className="scan-stat-pill">
+          <div className="scan-stat-value danger">{stats.overage}</div>
+          <div className="scan-stat-label">Overage</div>
         </div>
       </div>
     </div>
