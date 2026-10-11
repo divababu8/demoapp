@@ -722,24 +722,20 @@ table.data-table {
 .insp-textarea {
   width: 100%;
   border-radius: 14px;
-  padding: 14px 24px;          /* less vertical padding, no empty box feel */
+  padding: 0 24px;              /* horizontal only — height is set below */
   font-weight: 800;
-  font-size: 2.25rem;          /* BIGGER text */
+  font-size: 2.25rem;
   font-family: inherit;
-  line-height: 1.15;
+  line-height: 1;
   text-align: center;
   letter-spacing: 0.02em;
   border: 1px solid transparent;
-  resize: none;
-  overflow: hidden;
-  cursor: default;
   box-sizing: border-box;
-  /* fixed compact height so the box hugs the text */
-  height: 62px;
-  min-height: 0;
+  height: 72px;                 /* one consistent height */
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .insp-box-green {

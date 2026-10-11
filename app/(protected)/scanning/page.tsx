@@ -378,12 +378,9 @@ export default function ScanningPage() {
       {/* Manifest Description — Box1 + Box2 */}
       <div className="scan-field-group scan-page-row scan-field-desc">
         <div className="scan-field-label">Manifest Description</div>
-        <textarea
-          readOnly
-          rows={2}
-          value={result ? box1Text : "—"}
-          className={`insp-textarea ${result ? box1Class : "insp-box-green"}`}
-        />
+        <div className={`insp-textarea ${result ? box1Class : "insp-box-green"}`}>
+  {result ? box1Text : "—"}
+</div>
         {result && box2Lines.length > 0 && (
           <div className={`insp-box2 ${isRed ? "insp-box2-red" : ""}`}>
             {box2Lines.map((line, i) => (
