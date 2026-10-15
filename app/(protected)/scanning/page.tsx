@@ -300,8 +300,12 @@ export default function ScanningPage() {
     return lines;
   }, [inspection, aeBox2Value]);
 
-  const isRed = inspection?.level === "red";
-  const box1Text = isRed ? (inspection?.box1Message ?? "") : "";
+  // Keep the existing country-inspection rules and additionally flag CID
+  // in the VAT ID#/TIN# column as red for both Box1 and Box2.
+  const vatTinValue = result?.bill.extra_data?.["VAT ID#/TIN#"];
+  const hasCidInVatTin = /CID/i.test(String(vatTinValue ?? ""));
+  const isRed = inspection?.level === "red" || hasCidInVatTin;
+  const box1Text = inspection?.level === "red" ? (inspection?.box1Message ?? "") : "";
   const box1Class = isRed ? "insp-box-red" : "insp-box-green";
 
   const trackingNumberText = result ? result.bill.awb_number : "—";
