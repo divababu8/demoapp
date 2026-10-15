@@ -300,11 +300,11 @@ export default function ScanningPage() {
     return lines;
   }, [inspection, aeBox2Value]);
 
-  // Keep the existing country-inspection rules and additionally flag CID
+  // Keep the existing country-inspection rules and additionally flag QID
   // in the VAT ID#/TIN# column as red for both Box1 and Box2.
   const vatTinValue = result?.bill.extra_data?.["VAT ID#/TIN#"];
-  const hasCidInVatTin = /CID/i.test(String(vatTinValue ?? ""));
-  const isRed = inspection?.level === "red" || hasCidInVatTin;
+  const hasQidP2pOrOnlineQidInVatTin = /CID|P2P|ONLINE_QID/i.test(String(vatTinValue ?? ""));
+  const isRed = inspection?.level === "red" || hasQidP2pOrOnlineQidInVatTin;
   const box1Text = inspection?.level === "red" ? (inspection?.box1Message ?? "") : "";
   const box1Class = isRed ? "insp-box-red" : "insp-box-green";
 
