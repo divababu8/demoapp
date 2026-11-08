@@ -300,8 +300,6 @@ export default function ScanningPage() {
     return lines;
   }, [inspection, aeBox2Value]);
 
-  // Keep the existing country-inspection rules and additionally flag QID
-  // in the VAT ID#/TIN# column as red for both Box1 and Box2.
   const vatTinValue = result?.bill.extra_data?.["VAT ID#/TIN#"];
   const hasQidP2pOrOnlineQidInVatTin = /CID|P2P|ONLINE_QID/i.test(String(vatTinValue ?? ""));
   const isRed = inspection?.level === "red" || hasQidP2pOrOnlineQidInVatTin;
@@ -311,7 +309,6 @@ export default function ScanningPage() {
   const trackingNumberText = result ? result.bill.awb_number : "—";
   const flightNoText = result ? (result.bill.flight_number || "—") : "—";
   const manifestCodeText = result ? result.bill.manifest_number : "—";
-  const searchCountText = result ? String(result.searchCount) : "—";
 
   const statusLabel = !result
     ? "—"
@@ -361,9 +358,9 @@ export default function ScanningPage() {
 
       {notFound && <p className="scan-alert scan-page-alert">{notFound}</p>}
 
-      {/* Row 1: Tracking Number (hero) · Status · Search Count */}
-      <div className="scan-field-row scan-page-row scan-field-row-3col">
-        <div className="scan-field-group scan-field-hero">
+      {/* Row 1: Tracking Number (Huge) · Status (Big) */}
+      <div className="scan-field-row scan-page-row scan-field-row-tracking">
+        <div className="scan-field-group">
           <div className="scan-field-label">Tracking Number</div>
           <div className="scan-readonly mono scan-readonly-hero">{trackingNumberText}</div>
         </div>
@@ -372,10 +369,6 @@ export default function ScanningPage() {
           <div className={`scan-readonly mono scan-readonly-status${result ? (result.justScanned ? " scan-readonly-ok" : " scan-readonly-warn") : ""}`}>
             {statusLabel}
           </div>
-        </div>
-        <div className="scan-field-group">
-          <div className="scan-field-label scan-field-label-search">Search Count</div>
-          <div className="scan-readonly mono scan-readonly-search">{searchCountText}</div>
         </div>
       </div>
 
@@ -394,15 +387,15 @@ export default function ScanningPage() {
         )}
       </div>
 
-      {/* Flight No + Manifest Code */}
+      {/* Flight No + Manifest Code (Both Big) */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Flight No</div>
-          <div className="scan-readonly mono scan-readonly-lg">{flightNoText}</div>
+          <div className="scan-readonly mono scan-readonly-hero">{flightNoText}</div>
         </div>
         <div className="scan-field-group">
           <div className="scan-field-label">Manifest Code</div>
-          <div className="scan-readonly mono scan-readonly-lg scan-readonly-code">{manifestCodeText}</div>
+          <div className="scan-readonly mono scan-readonly-hero">{manifestCodeText}</div>
         </div>
       </div>
 
