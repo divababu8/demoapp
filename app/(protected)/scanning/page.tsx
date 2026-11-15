@@ -9,7 +9,8 @@ import {
   getAeBox2Value,
 } from "@/lib/countryInspection";
 
-const AWB_REGEX = /^\d{8,32}$/;
+// 1. Relaxed regex to allow massive scanner payloads
+const AWB_REGEX = /^\d{8,}$/;
 const AUTO_SUBMIT_DEBOUNCE_MS = 140;
 
 interface ScanResult {
@@ -85,7 +86,7 @@ export default function ScanningPage() {
     (data ?? []).forEach((r: any) => {
       const awb = String(r.awb_number);
       map.set(awb, r.id);
-      if (awb.length > 8) map.set(awb.slice(-8), r.id);
+      // We removed the slice(-8) map key here because it caused false negatives for longer numbers
     });
 
     indexRef.current = map;
@@ -156,22 +157,12 @@ export default function ScanningPage() {
 
   /* ---------- Submit ---------- */
   const submit = useCallback(async (raw: string) => {
-    const awb = raw.trim();
+    // 2. Remove ALL spaces (leading, trailing, and internal)
+    const awb = raw.trim().replace(/\s+/g, "");
     if (!awb) return;
 
     if (!AWB_REGEX.test(awb)) {
       setNotFound(`"${awb}" is not a valid tracking number.`);
-      setResult(null); setFlash("err"); beep("err");
-      lastSubmittedRef.current = awb;
-      return;
-    }
-
-    const map = indexRef.current;
-    const exactHit = map.has(awb);
-    const suffixHit = !exactHit && awb.length > 8 && map.has(awb.slice(-8));
-
-    if (map.size > 0 && !exactHit && !suffixHit) {
-      setNotFound(`Tracking number ${awb} not found in the current manifest (${indexSize} bills loaded).`);
       setResult(null); setFlash("err"); beep("err");
       lastSubmittedRef.current = awb;
       return;
@@ -189,6 +180,7 @@ export default function ScanningPage() {
       const res = await fetch("/api/bills/search", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
+        // Send the raw string. The backend SQL will figure out if it's an exact match or a suffix match.
         body: JSON.stringify({ awb_number: awb }),
       });
 
@@ -219,7 +211,7 @@ export default function ScanningPage() {
     } finally {
       if (mySeq === requestSeq.current) setPending(false);
     }
-  }, [indexSize]);
+  }, []);
 
   /* ---------- Input handlers ---------- */
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -228,7 +220,7 @@ export default function ScanningPage() {
 
     if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
 
-    const trimmed = value.trim();
+    const trimmed = value.trim().replace(/\s+/g, "");
     if (trimmed.length >= 8 && AWB_REGEX.test(trimmed)) {
       autoSubmitTimer.current = setTimeout(() => {
         if (pending && lastSubmittedRef.current === trimmed) return;
@@ -358,7 +350,6 @@ export default function ScanningPage() {
 
       {notFound && <p className="scan-alert scan-page-alert">{notFound}</p>}
 
-      {/* Row 1: Tracking Number (Huge) · Status (Big) */}
       <div className="scan-field-row scan-page-row scan-field-row-tracking">
         <div className="scan-field-group">
           <div className="scan-field-label">Tracking Number</div>
@@ -372,7 +363,6 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {/* Manifest Description — Box1 + Box2 */}
       <div className="scan-field-group scan-page-row scan-field-desc">
         <div className="scan-field-label">Manifest Description</div>
         <div className={`insp-textarea ${result ? box1Class : "insp-box-green"}`}>
@@ -387,7 +377,6 @@ export default function ScanningPage() {
         )}
       </div>
 
-      {/* Flight No + Manifest Code (Both Big) */}
       <div className="scan-field-row scan-page-row">
         <div className="scan-field-group">
           <div className="scan-field-label">Flight No</div>
@@ -399,7 +388,6 @@ export default function ScanningPage() {
         </div>
       </div>
 
-      {/* Stats — three cards in ONE row */}
       <div className="scan-stats-row scan-page-row">
         <div className="scan-stat-pill scan-stat-hero">
           <div className="scan-stat-total-badge">
