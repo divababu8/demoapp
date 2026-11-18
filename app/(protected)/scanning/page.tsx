@@ -9,7 +9,6 @@ import {
   getAeBox2Value,
 } from "@/lib/countryInspection";
 
-// 1. Relaxed regex to allow massive scanner payloads
 const AWB_REGEX = /^\d{8,}$/;
 const AUTO_SUBMIT_DEBOUNCE_MS = 140;
 
@@ -47,6 +46,9 @@ export default function ScanningPage() {
   const [flash, setFlash] = useState<"ok" | "warn" | "err" | null>(null);
   const [stats, setStats] = useState<ScanStats>({ scanned: 0, total: 0, shortage: 0, overage: 0 });
   const [indexSize, setIndexSize] = useState(0);
+  
+  // Modal state
+  const [showAlreadyScannedAlert, setShowAlreadyScannedAlert] = useState(false);
 
   const indexRef = useRef<Map<string, string>>(new Map());
   const latestManifestIdRef = useRef<string | null>(null);
@@ -86,7 +88,6 @@ export default function ScanningPage() {
     (data ?? []).forEach((r: any) => {
       const awb = String(r.awb_number);
       map.set(awb, r.id);
-      // We removed the slice(-8) map key here because it caused false negatives for longer numbers
     });
 
     indexRef.current = map;
@@ -157,7 +158,6 @@ export default function ScanningPage() {
 
   /* ---------- Submit ---------- */
   const submit = useCallback(async (raw: string) => {
-    // 2. Remove ALL spaces (leading, trailing, and internal)
     const awb = raw.trim().replace(/\s+/g, "");
     if (!awb) return;
 
@@ -173,6 +173,7 @@ export default function ScanningPage() {
     lastSubmittedRef.current = awb;
     setPending(true);
     setNotFound(null);
+    setShowAlreadyScannedAlert(false); // Reset modal on new scan
     inputRef.current?.focus();
 
     try {
@@ -180,7 +181,6 @@ export default function ScanningPage() {
       const res = await fetch("/api/bills/search", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
-        // Send the raw string. The backend SQL will figure out if it's an exact match or a suffix match.
         body: JSON.stringify({ awb_number: awb }),
       });
 
@@ -204,6 +204,11 @@ export default function ScanningPage() {
       setNotFound(null);
       setFlash(data.justScanned ? "ok" : "warn");
       beep(data.justScanned ? "ok" : "warn");
+
+      // Show modal if already scanned
+      if (!data.justScanned) {
+        setShowAlreadyScannedAlert(true);
+      }
     } catch {
       if (mySeq !== requestSeq.current) return;
       setNotFound("Network error — could not reach the server.");
@@ -268,6 +273,7 @@ export default function ScanningPage() {
   function clearAll() {
     setInput(""); setResult(null); setNotFound(null); setFlash(null);
     lastSubmittedRef.current = null;
+    setShowAlreadyScannedAlert(false);
     if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
     requestSeq.current++;
     inputRef.current?.focus();
@@ -312,6 +318,54 @@ export default function ScanningPage() {
 
   return (
     <div className="scan-page scan-page-fit">
+      {/* ===== MODAL OVERLAY ===== */}
+      {showAlreadyScannedAlert && result && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(15, 23, 42, 0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: "white",
+            borderRadius: "16px",
+            padding: "32px",
+            width: "100%",
+            maxWidth: "440px",
+            textAlign: "center",
+            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)"
+          }}>
+            <div style={{
+              width: "64px", height: "64px", borderRadius: "50%",
+              background: "#fef3c7", color: "#d97706",
+              display: "grid", placeItems: "center", margin: "0 auto 16px"
+            }}>
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3 2 20h20L12 3z" />
+                <path d="M12 9v5" />
+                <circle cx="12" cy="17" r=".6" fill="currentColor" />
+              </svg>
+            </div>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--ink)", marginBottom: "8px" }}>
+              Already Scanned
+            </h2>
+            <p style={{ fontSize: "0.95rem", color: "var(--ink-muted)", marginBottom: "24px" }}>
+              Tracking Number <strong style={{ color: "var(--ink)" }}>{result.bill.awb_number}</strong> was already scanned (Search Count: {result.searchCount}).
+            </p>
+            <button
+              className="btn btn-primary"
+              style={{ width: "100%", height: "48px", fontSize: "1rem" }}
+              onClick={() => setShowAlreadyScannedAlert(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="page-header scan-page-header">
         <div>
           <h1 className="page-title">Scan Shipments</h1>
