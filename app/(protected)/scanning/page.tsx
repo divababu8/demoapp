@@ -10,7 +10,10 @@ import {
 } from "@/lib/countryInspection";
 
 const AWB_REGEX = /^\d{8,}$/;
-const AUTO_SUBMIT_DEBOUNCE_MS = 140;
+// For humans: wait 300ms after they stop typing (lets them type 12-14 digits)
+const HUMAN_DEBOUNCE_MS = 300; 
+// For scanners: auto-submit 30ms after the last keystroke (scanners type faster than 30ms)
+const SCANNER_DEBOUNCE_MS = 30; 
 
 interface ScanResult {
   found: true;
@@ -47,7 +50,6 @@ export default function ScanningPage() {
   const [stats, setStats] = useState<ScanStats>({ scanned: 0, total: 0, shortage: 0, overage: 0 });
   const [indexSize, setIndexSize] = useState(0);
   
-  // Modal state
   const [showAlreadyScannedAlert, setShowAlreadyScannedAlert] = useState(false);
 
   const indexRef = useRef<Map<string, string>>(new Map());
@@ -58,6 +60,7 @@ export default function ScanningPage() {
 
   const autoSubmitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSubmittedRef = useRef<string | null>(null);
+  const lastKeystrokeTime = useRef<number>(0); // Tracks typing speed
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
@@ -173,7 +176,7 @@ export default function ScanningPage() {
     lastSubmittedRef.current = awb;
     setPending(true);
     setNotFound(null);
-    setShowAlreadyScannedAlert(false); // Reset modal on new scan
+    setShowAlreadyScannedAlert(false);
     inputRef.current?.focus();
 
     try {
@@ -205,7 +208,6 @@ export default function ScanningPage() {
       setFlash(data.justScanned ? "ok" : "warn");
       beep(data.justScanned ? "ok" : "warn");
 
-      // Show modal if already scanned
       if (!data.justScanned) {
         setShowAlreadyScannedAlert(true);
       }
@@ -221,16 +223,35 @@ export default function ScanningPage() {
   /* ---------- Input handlers ---------- */
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
+    const now = Date.now();
+    
+    // Calculate how long it's been since the last keystroke
+    const timeSinceLastKeystroke = now - lastKeystrokeTime.current;
+    lastKeystrokeTime.current = now;
+
     setInput(value);
 
     if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
 
     const trimmed = value.trim().replace(/\s+/g, "");
     if (trimmed.length >= 8 && AWB_REGEX.test(trimmed)) {
+      
+      // If time since last keystroke < 30ms, it's a barcode scanner (typing extremely fast).
+      // If it's > 30ms, it's a human typing.
+      const isScanner = timeSinceLastKeystroke < 30;
+      const delay = isScanner ? SCANNER_DEBOUNCE_MS : HUMAN_DEBOUNCE_MS;
+
       autoSubmitTimer.current = setTimeout(() => {
-        if (pending && lastSubmittedRef.current === trimmed) return;
-        submit(trimmed);
-      }, AUTO_SUBMIT_DEBOUNCE_MS);
+        // For humans, we check if they stopped typing for the full HUMAN_DEBOUNCE_MS.
+        // If they pressed another key, this timer is cleared. 
+        // Since humans want to press Enter, we ONLY auto-submit here if it's a scanner.
+        
+        if (isScanner) {
+          if (pending && lastSubmittedRef.current === trimmed) return;
+          submit(trimmed);
+        }
+        // If it's a human, we do NOT submit automatically. We wait for them to press Enter.
+      }, delay);
     }
   }
 
@@ -238,7 +259,7 @@ export default function ScanningPage() {
     if (e.key === "Enter") {
       e.preventDefault();
       if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
-      submit(input);
+      submit(input); // Manual Enter always triggers submission
     }
   }
 
@@ -274,6 +295,7 @@ export default function ScanningPage() {
     setInput(""); setResult(null); setNotFound(null); setFlash(null);
     lastSubmittedRef.current = null;
     setShowAlreadyScannedAlert(false);
+    lastKeystrokeTime.current = 0; // Reset typing speed
     if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
     requestSeq.current++;
     inputRef.current?.focus();
